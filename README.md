@@ -1,10 +1,8 @@
 # aw-store
 
-Key-value storage library based on Tencent MMKV. Provides Kotlin property delegate for type-safe storage with encryption support.
+基于腾讯 MMKV 的键值存储库，提供 Kotlin 属性委托语法实现类型安全的存储，支持加密。
 
-## Installation
-
-Add the dependency in your module-level `build.gradle.kts`:
+## 引入
 
 ```kotlin
 dependencies {
@@ -12,58 +10,46 @@ dependencies {
 }
 ```
 
-Make sure you have the JitPack repository in your root `settings.gradle.kts`:
+## 功能特性
+
+- 属性委托语法读写 MMKV
+- 9 种数据类型：String、Int、Long、Float、Double、Boolean、ByteArray、Set<String>、Parcelable
+- 多实例隔离（mmapId）
+- AES-CFB 加密（cryptKey）
+- SharedPreferences 一键迁移工具（SpMigration）
+- reified Parcelable 委托简化用法
+
+## 使用示例
 
 ```kotlin
-dependencyResolutionManagement {
-    repositories {
-        google()
-        mavenCentral()
-        maven("https://jitpack.io")
-    }
-}
-```
-
-## Features
-
-- Property delegate syntax for MMKV read/write
-- 9 data types: String, Int, Long, Float, Double, Boolean, ByteArray, Set<String>, Parcelable
-- Multi-instance isolation with mmapId
-- AES-CFB encryption with cryptKey
-- SharedPreferences migration tool (SpMigration)
-- Reified parcelable delegate for simplified usage
-
-## Usage
-
-```kotlin
-// Initialize
+// 初始化
 BrickStore.init(this)
 
-// Define store
+// 定义存储
 object UserStore : MmkvDelegate() {
     var token by string("token", "")
     var userId by long("user_id", 0L)
     var isLoggedIn by boolean("is_logged_in", false)
 }
 
-// Encrypted store
+// 加密存储
 object SecureStore : MmkvDelegate(cryptKey = "secret") {
     var password by string("password", "")
 }
 
-// Read/Write
+// 读写
 UserStore.token = "abc123"
 val token = UserStore.token
 
-// Parcelable (reified)
+// Parcelable（reified 简化版）
 object DataStore : MmkvDelegate() {
     var profile by parcelable<UserProfile>("profile")
 }
 
-// SP Migration
+// SP 迁移
 SpMigration.migrate(this, "old_prefs")
 ```
 
-## License
+## 许可证
 
-Apache License 2.0. See [LICENSE](LICENSE) for details.
+Apache License 2.0，详见 [LICENSE](LICENSE)。
