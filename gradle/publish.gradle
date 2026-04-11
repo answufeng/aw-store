@@ -1,0 +1,40 @@
+apply plugin: 'maven-publish'
+
+afterEvaluate {
+    publishing {
+        publications {
+            release(MavenPublication) {
+                from components.release
+
+                groupId = 'com.github.answufeng.aw-store'
+                artifactId = project.name
+                version = project.findProperty('VERSION_NAME') ?: '1.0.0'
+
+                pom {
+                    name = project.name
+                    description = "aw-store - Key-value storage library based on MMKV"
+                    url = 'https://github.com/answufeng/aw-store'
+
+                    licenses {
+                        license {
+                            name = 'The Apache License, Version 2.0'
+                            url = 'https://www.apache.org/licenses/LICENSE-2.0.txt'
+                        }
+                    }
+
+                    developers {
+                        developer {
+                            id = 'answufeng'
+                            name = 'answufeng'
+                        }
+                    }
+
+                    scm {
+                        connection = 'scm:git:https://github.com/answufeng/aw-store.git'
+                        url = 'https://github.com/answufeng/aw-store'
+                    }
+                }
+            }
+        }
+    }
+}
