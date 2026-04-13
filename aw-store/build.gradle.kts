@@ -30,16 +30,25 @@ android {
             )
         }
     }
+
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
+    }
 }
 
 dependencies {
     implementation(libs.core.ktx)
     implementation(libs.annotation)
-    implementation(libs.mmkv)
-    implementation(libs.coroutines.core)
-    implementation(libs.coroutines.android)
+    api(libs.mmkv)
 
     testImplementation(libs.junit)
+
+    androidTestImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.test.core)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.ext.junit)
 }
 
 apply(from = "${rootDir}/gradle/publish.gradle")

@@ -12,7 +12,23 @@
         android:text="aw-store Demo"
         android:textSize="24sp"
         android:textStyle="bold"
-        android:layout_marginBottom="16dp" />
+        android:layout_marginBottom="8dp" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="120dp"
+        android:background="#F5F5F5"
+        android:layout_marginBottom="8dp">
+
+        <TextView
+            android:id="@+id/tvLog"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:fontFamily="monospace"
+            android:padding="8dp" />
+
+    </ScrollView>
 
     <ScrollView
         android:layout_width="match_parent"

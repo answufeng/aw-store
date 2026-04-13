@@ -6,13 +6,13 @@ afterEvaluate {
             release(MavenPublication) {
                 from components.release
 
-                groupId = 'com.github.answufeng.aw-store'
-                artifactId = project.name
+                groupId = 'com.github.answufeng'
+                artifactId = 'aw-store'
                 version = project.findProperty('VERSION_NAME') ?: '1.0.0'
 
                 pom {
-                    name = project.name
-                    description = "aw-store - Key-value storage library based on MMKV"
+                    name = 'aw-store'
+                    description = "Android key-value storage library based on MMKV with Kotlin property delegate"
                     url = 'https://github.com/answufeng/aw-store'
 
                     licenses {
