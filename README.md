@@ -4,7 +4,7 @@
 
 基于腾讯 MMKV 封装的 Android 键值存储库，提供 Kotlin 属性委托语法实现类型安全的存储，支持加密、多实例隔离和 SharedPreferences 一键迁移。
 
-## ✨ 功能特性
+## 特性
 
 - **属性委托语法**：`by string()` / `by int()` / `by boolean()` … 声明即存储
 - **9 种数据类型**：String、Int、Long、Float、Double、Boolean、ByteArray、Set\<String\>、Parcelable
@@ -17,7 +17,7 @@
 - **reified Parcelable**：泛型简化 Parcelable 委托用法
 - **调试日志**：可选日志输出，方便排查问题
 
-## 📦 引入方式
+## 引入
 
 ```kotlin
 // settings.gradle.kts
@@ -35,7 +35,7 @@ dependencies {
 
 > MMKV 以 `api` 方式传递，无需额外声明。
 
-## 🚀 快速开始
+## 快速开始
 
 ### 初始化
 
@@ -79,7 +79,7 @@ UserStore.nickname = null       // 删除键
 val nick = UserStore.nickname   // null
 ```
 
-## 🔐 加密存储
+## 加密存储
 
 ```kotlin
 object SecureStore : MmkvDelegate(cryptKey = "my_secret_key") {
@@ -89,7 +89,7 @@ object SecureStore : MmkvDelegate(cryptKey = "my_secret_key") {
 
 > 不同 `cryptKey` 会自动使用不同的 MMKV 实例，不会相互覆盖。
 
-## 📦 多实例隔离
+## 多实例隔离
 
 ```kotlin
 object UserStore : MmkvDelegate() { ... }
@@ -102,7 +102,7 @@ object SecureStore : MmkvDelegate(cryptKey = "key123") { ... }
 | `mmapId` | MMKV 实例 ID，不同 ID 对应不同存储文件 |
 | `cryptKey` | 加密密钥，传入后使用 AES-CFB 加密 |
 
-## 📋 Parcelable 存储
+## Parcelable 存储
 
 ```kotlin
 @Parcelize
@@ -119,7 +119,7 @@ val p = DataStore.profile  // UserProfile?
 
 > `parcelable` 委托返回可空类型，赋值 `null` 时自动删除对应键。
 
-## 🔄 SharedPreferences 迁移
+## SharedPreferences 迁移
 
 ```kotlin
 // 迁移默认 SP 到默认 MMKV
@@ -149,7 +149,7 @@ data class MigrationResult(
 
 > 迁移是幂等的，已迁移的 SP 文件再次调用不会重复写入。当存在失败项时不会删除原 SP 数据。
 
-## 👂 跨进程数据变化监听
+## 跨进程数据变化监听
 
 当 MMKV 实例被其他进程修改时，可收到通知：
 
@@ -164,7 +164,7 @@ UserStore.unregisterContentChange()
 
 > 注意：此监听仅在其他进程修改数据时触发，当前进程的修改不会触发回调。回调参数为被修改的 MMKV 实例 ID（mmapID），而非具体键名。
 
-## 🛠 工具方法
+## 工具方法
 
 ```kotlin
 // 检查键是否存在
@@ -192,7 +192,7 @@ UserStore.sync()
 UserStore.async()
 ```
 
-## ⚙️ 全局配置
+## 全局配置
 
 | 配置 | 方法 | 说明 |
 |------|------|------|
@@ -201,13 +201,13 @@ UserStore.async()
 | 调试日志 | `AwStoreLogger.enabled = BuildConfig.DEBUG` | 开启后输出迁移、初始化等日志 |
 | 存储根目录 | `AwStore.rootDir` | 获取当前 MMKV 根目录路径 |
 
-## 📋 依赖说明
+## 依赖说明
 
 | 依赖 | 版本 | 用途 |
 |------|------|------|
 | MMKV | 2.0.1 | 高性能键值存储引擎 |
 
-## ⚠️ 注意事项
+## 注意事项
 
 - **初始化顺序**：访问任何存储属性前必须调用 `AwStore.init()`，否则抛出 `IllegalStateException`
 - **StringSet 不可变性**：`stringSet` 返回的是不可变集合，修改时需创建新集合并重新赋值

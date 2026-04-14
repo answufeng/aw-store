@@ -21,6 +21,12 @@ android {
         jvmTarget = "17"
     }
 
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -30,18 +36,12 @@ android {
             )
         }
     }
-
-    testOptions {
-        unitTests {
-            isIncludeAndroidResources = true
-        }
-    }
 }
 
 dependencies {
+    api(libs.mmkv)
     implementation(libs.core.ktx)
     implementation(libs.annotation)
-    api(libs.mmkv)
 
     testImplementation(libs.junit)
 
