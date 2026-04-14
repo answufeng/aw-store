@@ -1,6 +1,6 @@
 # aw-store
 
-[![](https://jitpack.io/v/answufeng/aw-store.svg)](https://jitpack.io/#/answufeng/aw-store)
+[![](https://jitpack.io/v/answufeng/aw-store.svg)](https://jitpack.io/#answufeng/aw-store)
 
 基于腾讯 MMKV 封装的 Android 键值存储库，提供 Kotlin 属性委托语法实现类型安全的存储，支持加密、多实例隔离、多进程和 SharedPreferences 一键迁移。
 
