@@ -39,6 +39,30 @@ class MmkvDelegateInstrumentedTest {
     }
 
     @Test
+    fun stringDelegateKeyAutoInference() {
+        val delegate = object : MmkvDelegate(mmapId = "test_str_auto_${System.nanoTime()}") {
+            var name by string("default")
+        }
+        assertEquals("default", delegate.name)
+        delegate.name = "hello"
+        assertEquals("hello", delegate.name)
+        assertTrue(delegate.contains("name"))
+        delegate.clear()
+    }
+
+    @Test
+    fun stringDelegateNoArgs() {
+        val delegate = object : MmkvDelegate(mmapId = "test_str_noargs_${System.nanoTime()}") {
+            var token by string()
+        }
+        assertEquals("", delegate.token)
+        delegate.token = "abc"
+        assertEquals("abc", delegate.token)
+        assertTrue(delegate.contains("token"))
+        delegate.clear()
+    }
+
+    @Test
     fun nullableStringDelegateReadWriteNull() {
         val delegate = object : MmkvDelegate(mmapId = "test_nullable_${System.nanoTime()}") {
             var nickname by nullableString("nickname")
@@ -59,6 +83,85 @@ class MmkvDelegateInstrumentedTest {
         assertEquals(0, delegate.count)
         delegate.count = 42
         assertEquals(42, delegate.count)
+        delegate.clear()
+    }
+
+    @Test
+    fun nullableIntDelegate() {
+        val delegate = object : MmkvDelegate(mmapId = "test_nullable_int_${System.nanoTime()}") {
+            var age by nullableInt()
+        }
+        assertNull(delegate.age)
+        delegate.age = 25
+        assertEquals(25, delegate.age)
+        delegate.age = null
+        assertNull(delegate.age)
+        assertFalse(delegate.contains("age"))
+        delegate.clear()
+    }
+
+    @Test
+    fun nullableLongDelegate() {
+        val delegate = object : MmkvDelegate(mmapId = "test_nullable_long_${System.nanoTime()}") {
+            var timestamp by nullableLong()
+        }
+        assertNull(delegate.timestamp)
+        delegate.timestamp = 123456789L
+        assertEquals(123456789L, delegate.timestamp)
+        delegate.timestamp = null
+        assertNull(delegate.timestamp)
+        delegate.clear()
+    }
+
+    @Test
+    fun nullableFloatDelegate() {
+        val delegate = object : MmkvDelegate(mmapId = "test_nullable_float_${System.nanoTime()}") {
+            var score by nullableFloat()
+        }
+        assertNull(delegate.score)
+        delegate.score = 95.5f
+        assertEquals(95.5f, delegate.score!!, 0.001f)
+        delegate.score = null
+        assertNull(delegate.score)
+        delegate.clear()
+    }
+
+    @Test
+    fun nullableDoubleDelegate() {
+        val delegate = object : MmkvDelegate(mmapId = "test_nullable_double_${System.nanoTime()}") {
+            var ratio by nullableDouble()
+        }
+        assertNull(delegate.ratio)
+        delegate.ratio = 3.14159
+        assertEquals(3.14159, delegate.ratio!!, 0.001)
+        delegate.ratio = null
+        assertNull(delegate.ratio)
+        delegate.clear()
+    }
+
+    @Test
+    fun nullableBooleanDelegate() {
+        val delegate = object : MmkvDelegate(mmapId = "test_nullable_bool_${System.nanoTime()}") {
+            var enabled by nullableBoolean()
+        }
+        assertNull(delegate.enabled)
+        delegate.enabled = true
+        assertTrue(delegate.enabled!!)
+        delegate.enabled = null
+        assertNull(delegate.enabled)
+        delegate.clear()
+    }
+
+    @Test
+    fun nullableBytesDelegate() {
+        val delegate = object : MmkvDelegate(mmapId = "test_nullable_bytes_${System.nanoTime()}") {
+            var data by nullableBytes()
+        }
+        assertNull(delegate.data)
+        delegate.data = byteArrayOf(1, 2, 3)
+        assertArrayEquals(byteArrayOf(1, 2, 3), delegate.data)
+        delegate.data = null
+        assertNull(delegate.data)
         delegate.clear()
     }
 
@@ -208,6 +311,17 @@ class MmkvDelegateInstrumentedTest {
     }
 
     @Test
+    fun encryptedStoreWithCryptKey() {
+        val key = CryptKey.fromSecureRandom()
+        val store = object : MmkvDelegate(secureCryptKey = key) {
+            var secret by string("secret", "")
+        }
+        store.secret = "password123"
+        assertEquals("password123", store.secret)
+        store.clear()
+    }
+
+    @Test
     fun multipleEncryptedStoresWithDifferentKeysAreIsolated() {
         val id = System.nanoTime()
         val store1 = object : MmkvDelegate(cryptKey = "key1_$id") {
@@ -222,5 +336,28 @@ class MmkvDelegateInstrumentedTest {
         assertEquals("from_store2", store2.data)
         store1.clear()
         store2.clear()
+    }
+
+    @Test
+    fun multiProcessStoreReadWrite() {
+        val store = object : MmkvDelegate(mmapId = "test_multi_${System.nanoTime()}", multiProcess = true) {
+            var counter by int("counter", 0)
+        }
+        assertEquals(0, store.counter)
+        store.counter = 42
+        assertEquals(42, store.counter)
+        store.clear()
+    }
+
+    @Test
+    fun contentChangeRegisterAndUnregister() {
+        val store = object : MmkvDelegate(mmapId = "test_listener_${System.nanoTime()}") {
+            var data by string("data", "")
+        }
+        var receivedMmapId: String? = null
+        val listener: (String) -> Unit = { receivedMmapId = it }
+        store.registerContentChange(listener)
+        store.unregisterContentChange(listener)
+        store.clear()
     }
 }

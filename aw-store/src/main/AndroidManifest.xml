@@ -1,2 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest />
+<manifest>
+    <application>
+        <provider
+            android:name="com.answufeng.store.AwStoreInitializer"
+            android:authorities="${applicationId}.aw-store-init"
+            android:exported="false"
+            android:initOrder="100" />
+    </application>
+</manifest>

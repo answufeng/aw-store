@@ -93,4 +93,19 @@ class SpMigrationInstrumentedTest {
         val result = SpMigration.migrate(context, name, mmapId = "migrate_null_target_${System.nanoTime()}")
         assertTrue(result.skippedKeys.contains("null_key"))
     }
+
+    @Test
+    fun migrateWithMultiProcess() {
+        val name = "migrate_multi_${System.nanoTime()}"
+        val sp = context.getSharedPreferences(name, Context.MODE_PRIVATE)
+        sp.edit().putString("key", "value").commit()
+
+        val result = SpMigration.migrate(
+            context, name,
+            mmapId = "migrate_multi_target_${System.nanoTime()}",
+            multiProcess = true
+        )
+        assertTrue(result.isSuccess)
+        assertEquals(1, result.successCount)
+    }
 }

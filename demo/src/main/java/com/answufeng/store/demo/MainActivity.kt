@@ -8,24 +8,32 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import com.answufeng.store.AwStore
 import com.answufeng.store.AwStoreLogger
+import com.answufeng.store.CryptKey
 import com.answufeng.store.MmkvDelegate
 import com.answufeng.store.SpMigration
 
 object UserStore : MmkvDelegate() {
-    var token by string("token", "")
-    var userId by long("user_id", 0L)
-    var isLoggedIn by boolean("is_logged_in", false)
-    var score by float("score", 0f)
-    var tags by stringSet("tags")
-    var nickname by nullableString("nickname")
+    var token by string()
+    var userId by long()
+    var isLoggedIn by boolean()
+    var score by float()
+    var tags by stringSet()
+    var nickname by nullableString()
+    var age by nullableInt()
 }
 
-object SecureStore : MmkvDelegate(cryptKey = "my_secret_key") {
-    var password by string("password", "")
+object SecureStore : MmkvDelegate(
+    secureCryptKey = CryptKey.fromSecureRandom()
+) {
+    var password by string()
 }
 
 object IsolatedStore : MmkvDelegate(mmapId = "isolated") {
-    var data by string("data", "")
+    var data by string()
+}
+
+object MultiProcessStore : MmkvDelegate(mmapId = "shared", multiProcess = true) {
+    var counter by int()
 }
 
 class MainActivity : AppCompatActivity() {
@@ -37,7 +45,9 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         AwStoreLogger.enabled = true
-        AwStore.init(this)
+        if (!AwStore.isInitialized) {
+            AwStore.init(this)
+        }
 
         tvLog = findViewById(R.id.tvLog)
         val container = findViewById<LinearLayout>(R.id.container)
@@ -49,6 +59,7 @@ class MainActivity : AppCompatActivity() {
             UserStore.score = 95.5f
             UserStore.tags = setOf("kotlin", "android")
             UserStore.nickname = "Alice"
+            UserStore.age = 25
             log("Values written")
         })
 
@@ -59,11 +70,17 @@ class MainActivity : AppCompatActivity() {
             log("score: ${UserStore.score}")
             log("tags: ${UserStore.tags}")
             log("nickname: ${UserStore.nickname}")
+            log("age: ${UserStore.age}")
         })
 
         container.addView(button("Nullable String (set null)") {
             UserStore.nickname = null
             log("nickname after null: ${UserStore.nickname}")
+        })
+
+        container.addView(button("Nullable Int (set null)") {
+            UserStore.age = null
+            log("age after null: ${UserStore.age}")
         })
 
         container.addView(button("Encrypted Store") {
@@ -75,6 +92,11 @@ class MainActivity : AppCompatActivity() {
             IsolatedStore.data = "isolated_data"
             log("IsolatedStore.data: ${IsolatedStore.data}")
             log("UserStore.token (unchanged): ${UserStore.token}")
+        })
+
+        container.addView(button("Multi-Process Store") {
+            MultiProcessStore.counter++
+            log("Multi-Process counter: ${MultiProcessStore.counter}")
         })
 
         container.addView(button("Contains / AllKeys / Remove") {
@@ -107,6 +129,7 @@ class MainActivity : AppCompatActivity() {
             UserStore.clear()
             SecureStore.clear()
             IsolatedStore.clear()
+            MultiProcessStore.clear()
             log("All stores cleared")
         })
 
