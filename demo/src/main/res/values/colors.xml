@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 主色调 - 绿色主题 -->
+    <color name="primary">#4CAF50</color>
+    <color name="primary_variant">#388E3C</color>
+    <color name="secondary">#8BC34A</color>
+    <color name="secondary_variant">#689F38</color>
+    
+    <!-- 背景色 -->
+    <color name="background">#FAFAFA</color>
+    <color name="surface">#FFFFFF</color>
+    <color name="surface_variant">#F5F5F5</color>
+    
+    <!-- 文字颜色 -->
+    <color name="on_primary">#FFFFFF</color>
+    <color name="on_secondary">#FFFFFF</color>
+    <color name="on_background">#212121</color>
+    <color name="on_surface">#212121</color>
+    <color name="on_surface_variant">#757575</color>
+    
+    <!-- 状态色 -->
+    <color name="success">#4CAF50</color>
+    <color name="warning">#FF9800</color>
+    <color name="error">#F44336</color>
+    <color name="info">#2196F3</color>
+    
+    <!-- 按钮颜色 -->
+    <color name="button_background">@color/primary</color>
+    <color name="button_text">@color/on_primary</color>
+    <color name="button_outline">@color/primary</color>
+    
+    <!-- 卡片颜色 -->
+    <color name="card_background">@color/surface</color>
+    <color name="card_border">#E0E0E0</color>
+    
+    <!-- 阴影色 -->
+    <color name="shadow">#1A000000</color>
+    
+    <!-- 日志区域颜色 -->
+    <color name="log_background">#F8F9FA</color>
+    <color name="log_text">#495057</color>
+    <color name="log_header">@color/primary</color>
+</resources>

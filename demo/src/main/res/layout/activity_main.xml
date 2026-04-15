@@ -1,178 +1,284 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#FAFAFA"
-    android:fillViewport="true">
+    android:background="@color/background">
 
-    <LinearLayout
+    <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp">
+        android:background="@color/primary">
 
-        <!-- 标题 -->
-        <TextView
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/toolbar"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center"
-            android:text="💾 aw-store 存储库演示"
-            android:textSize="22sp"
-            android:textStyle="bold" />
+            android:layout_height="?attr/actionBarSize"
+            android:theme="@style/Toolbar.AwStore"
+            app:title="存储库演示"
+            app:titleTextColor="@color/on_primary" />
 
-        <!-- 副标题 -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center"
-            android:text="MMKV封装 · 加密存储 · 多实例隔离 · SP迁移"
-            android:textColor="#999999"
-            android:textSize="13sp"
-            android:layout_marginBottom="12dp" />
+    </com.google.android.material.appbar.AppBarLayout>
 
-        <!-- 日志区域 -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:background="#2196F3"
-            android:padding="8dp"
-            android:text="📋 操作日志"
-            android:textColor="#FFFFFF"
-            android:textSize="14sp"
-            android:textStyle="bold" />
+    <com.google.android.material.card.MaterialCardView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_margin="16dp"
+        android:layout_marginTop="?attr/actionBarSize"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior"
+        style="@style/Card.AwStore">
 
         <ScrollView
-            android:id="@+id/logScrollView"
             android:layout_width="match_parent"
-            android:layout_height="160dp"
-            android:background="#FFFFFF"
-            android:layout_marginBottom="16dp">
+            android:layout_height="match_parent"
+            android:padding="16dp">
 
-            <TextView
-                android:id="@+id/tvLog"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:fontFamily="monospace"
-                android:padding="8dp"
-                android:textSize="12sp"
-                android:textColor="#333333" />
+                android:orientation="vertical">
 
+                <!-- 操作日志区域 -->
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="16dp"
+                    style="@style/Card.AwStore">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="操作日志"
+                            style="@style/Text.AwStore.Subtitle"
+                            android:layout_marginBottom="8dp" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="MMKV封装 · 加密存储 · 多实例隔离 · SP迁移"
+                            style="@style/Text.AwStore.Body"
+                            android:layout_marginBottom="12dp" />
+
+                        <ScrollView
+                            android:id="@+id/logScrollView"
+                            android:layout_width="match_parent"
+                            android:layout_height="160dp"
+                            android:background="@color/log_background"
+                            android:padding="8dp">
+
+                            <TextView
+                                android:id="@+id/tvLog"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                style="@style/Text.AwStore.Log"
+                                android:text="操作日志将显示在这里..." />
+
+                        </ScrollView>
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnClearLog"
+                            style="@style/MaterialButton.AwStore.Outlined"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:text="清除日志" />
+
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- 基本存储卡片 -->
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="16dp"
+                    style="@style/Card.AwStore">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="基本存储"
+                            style="@style/Text.AwStore.Subtitle"
+                            android:layout_marginBottom="12dp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnWrite"
+                            style="@style/MaterialButton.AwStore.Outlined"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="写入基本值(6种类型)"
+                            android:layout_marginBottom="8dp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnRead"
+                            style="@style/MaterialButton.AwStore.Outlined"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="读取基本值"
+                            android:layout_marginBottom="8dp" />
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal">
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnNullableString"
+                                style="@style/MaterialButton.AwStore.Text"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="设置可空字符串为null"
+                                android:layout_marginEnd="4dp" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnNullableInt"
+                                style="@style/MaterialButton.AwStore.Text"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="设置可空整型为null"
+                                android:layout_marginStart="4dp" />
+
+                        </LinearLayout>
+
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- 高级功能卡片 -->
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="16dp"
+                    style="@style/Card.AwStore">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="高级功能"
+                            style="@style/Text.AwStore.Subtitle"
+                            android:layout_marginBottom="12dp" />
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal">
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnEncrypted"
+                                style="@style/MaterialButton.AwStore.Outlined"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="加密存储(AES)"
+                                android:layout_marginEnd="4dp" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnIsolation"
+                                style="@style/MaterialButton.AwStore.Outlined"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="多实例隔离存储"
+                                android:layout_marginHorizontal="4dp" />
+
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:layout_marginTop="8dp">
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnMultiProcess"
+                                style="@style/MaterialButton.AwStore.Outlined"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="多进程共享存储"
+                                android:layout_marginEnd="4dp" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnSpMigration"
+                                style="@style/MaterialButton.AwStore.Outlined"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="SP迁移到MMKV"
+                                android:layout_marginStart="4dp" />
+
+                        </LinearLayout>
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnContentChange"
+                            style="@style/MaterialButton.AwStore.Outlined"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="注册内容变化监听" />
+
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- 管理功能卡片 -->
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    style="@style/Card.AwStore">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="管理功能"
+                            style="@style/Text.AwStore.Subtitle"
+                            android:layout_marginBottom="12dp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnManage"
+                            style="@style/MaterialButton.AwStore.Outlined"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Contains/AllKeys/Remove"
+                            android:layout_marginBottom="8dp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnClearAll"
+                            style="@style/MaterialButton.AwStore"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="清除所有存储"
+                            android:backgroundTint="@color/error" />
+
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+            </LinearLayout>
         </ScrollView>
 
-        <!-- 基本存储分类 -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="📝 基本存储"
-            android:textColor="#424242"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="8dp" />
+    </com.google.android.material.card.MaterialCardView>
 
-        <Button
-            android:id="@+id/btnWrite"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:text="写入 基本值(6种类型)"
-            android:layout_marginBottom="8dp" />
-
-        <Button
-            android:id="@+id/btnRead"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:text="读取 基本值"
-            android:layout_marginBottom="8dp" />
-
-        <Button
-            android:id="@+id/btnNullableString"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:text="设置 可空字符串为null"
-            android:layout_marginBottom="8dp" />
-
-        <Button
-            android:id="@+id/btnNullableInt"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:text="设置 可空整型为null"
-            android:layout_marginBottom="16dp" />
-
-        <!-- 高级功能分类 -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="⚡ 高级功能"
-            android:textColor="#424242"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="8dp" />
-
-        <Button
-            android:id="@+id/btnEncrypted"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:text="加密 存储(AES)"
-            android:layout_marginBottom="8dp" />
-
-        <Button
-            android:id="@+id/btnIsolation"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:text="多实例 隔离存储"
-            android:layout_marginBottom="8dp" />
-
-        <Button
-            android:id="@+id/btnMultiProcess"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:text="多进程 共享存储"
-            android:layout_marginBottom="8dp" />
-
-        <Button
-            android:id="@+id/btnSpMigration"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:text="SP 迁移到MMKV"
-            android:layout_marginBottom="8dp" />
-
-        <Button
-            android:id="@+id/btnContentChange"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:text="注册 内容变化监听"
-            android:layout_marginBottom="16dp" />
-
-        <!-- 管理分类 -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="🔧 管理"
-            android:textColor="#424242"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="8dp" />
-
-        <Button
-            android:id="@+id/btnManage"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:text="Contains/AllKeys/Remove"
-            android:layout_marginBottom="8dp" />
-
-        <Button
-            android:id="@+id/btnClearAll"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:text="清除 所有存储"
-            android:layout_marginBottom="8dp" />
-
-        <Button
-            android:id="@+id/btnClearLog"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:text="🗑️ 清除日志"
-            android:layout_marginBottom="8dp" />
-
-    </LinearLayout>
-
-</ScrollView>
+</androidx.coordinatorlayout.widget.CoordinatorLayout>
