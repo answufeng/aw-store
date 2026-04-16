@@ -2,8 +2,6 @@ package com.answufeng.store.demo
 
 import android.os.Bundle
 import android.widget.Button
-import android.widget.LinearLayout
-import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import com.answufeng.store.AwStore
@@ -11,12 +9,7 @@ import com.answufeng.store.AwStoreLogger
 import com.answufeng.store.CryptKey
 import com.answufeng.store.MmkvDelegate
 import com.answufeng.store.SpMigration
-import com.google.android.material.card.MaterialCardView
 
-/**
- * aw-store 库功能演示
- * 包含：基本存储、加密存储、多实例隔离、多进程、SP迁移等功能
- */
 object UserStore : MmkvDelegate() {
     var token by string()
     var userId by long()
@@ -27,9 +20,7 @@ object UserStore : MmkvDelegate() {
     var age by nullableInt()
 }
 
-object SecureStore : MmkvDelegate(
-    secureCryptKey = CryptKey.fromSecureRandom()
-) {
+object SecureStore : MmkvDelegate(secureCryptKey = CryptKey.fromSecureRandom()) {
     var password by string()
 }
 
@@ -44,107 +35,37 @@ object MultiProcessStore : MmkvDelegate(mmapId = "shared", multiProcess = true) 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var tvLog: TextView
-    private lateinit var logScrollView: ScrollView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // 主布局
-        val mainLayout = findViewById<LinearLayout>(R.id.mainLayout)
+        tvLog = findViewById(R.id.tvLog)
 
-        // 标题
-        mainLayout.addView(TextView(this).apply {
-            text = "💾 aw-store 功能演示"
-            textSize = 20f
-            setPadding(0, 0, 0, 20)
-        })
+        findViewById<Button>(R.id.btnWrite).setOnClickListener { writeValues() }
+        findViewById<Button>(R.id.btnRead).setOnClickListener { readValues() }
+        findViewById<Button>(R.id.btnNullableString).setOnClickListener { setNullableStringNull() }
+        findViewById<Button>(R.id.btnNullableInt).setOnClickListener { setNullableIntNull() }
+        findViewById<Button>(R.id.btnEncrypted).setOnClickListener { testEncryptedStore() }
+        findViewById<Button>(R.id.btnIsolation).setOnClickListener { testIsolation() }
+        findViewById<Button>(R.id.btnMultiProcess).setOnClickListener { testMultiProcess() }
+        findViewById<Button>(R.id.btnSpMigration).setOnClickListener { testSpMigration() }
+        findViewById<Button>(R.id.btnContentChange).setOnClickListener { testContentChangeListener() }
+        findViewById<Button>(R.id.btnManage).setOnClickListener { testManage() }
+        findViewById<Button>(R.id.btnClearAll).setOnClickListener { clearAll() }
+        findViewById<Button>(R.id.btnClearLog).setOnClickListener { clearLog() }
 
-        // 基本存储卡片
-        val basicCard = createCard("基本存储")
-        val basicLayout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        basicLayout.addView(createButton("✏️ 写入基本值", ::writeValues))
-        basicLayout.addView(createButton("📖 读取基本值", ::readValues))
-        basicLayout.addView(createButton("🔄 可空字符串设为null", ::setNullableStringNull))
-        basicLayout.addView(createButton("🔄 可空整型设为null", ::setNullableIntNull))
-        basicCard.addView(basicLayout)
-        mainLayout.addView(basicCard)
-
-        // 高级功能卡片
-        val advancedCard = createCard("高级功能")
-        val advancedLayout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        advancedLayout.addView(createButton("🔒 加密存储", ::testEncryptedStore))
-        advancedLayout.addView(createButton("🔄 多实例隔离", ::testIsolation))
-        advancedLayout.addView(createButton("🔄 多进程支持", ::testMultiProcess))
-        advancedLayout.addView(createButton("🔄 SP 迁移", ::testSpMigration))
-        advancedLayout.addView(createButton("🔄 内容变化监听", ::testContentChangeListener))
-        advancedCard.addView(advancedLayout)
-        mainLayout.addView(advancedCard)
-
-        // 管理功能卡片
-        val manageCard = createCard("管理功能")
-        val manageLayout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        manageLayout.addView(createButton("🔧 存储管理", ::testManage))
-        manageLayout.addView(createButton("🗑️ 清除所有存储", ::clearAll))
-        manageLayout.addView(createButton("🗑️ 清除日志", ::clearLog))
-        manageCard.addView(manageLayout)
-        mainLayout.addView(manageCard)
-
-        // 日志区域
-        mainLayout.addView(TextView(this).apply {
-            text = "操作日志："
-            textSize = 16f
-            setPadding(0, 20, 0, 10)
-        })
-
-        // 初始化存储
         AwStoreLogger.enabled = true
         if (!AwStore.isInitialized) {
             AwStore.init(this)
         }
 
-        logScrollView = findViewById(R.id.logScrollView)
-        tvLog = findViewById(R.id.tvLog)
-
-        // 显示初始信息
         log("✅ 存储初始化完成")
         log("📊 点击按钮测试各项功能")
     }
 
-    private fun createCard(title: String): MaterialCardView {
-        return MaterialCardView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                setMargins(0, 0, 0, 16)
-            }
-            setPadding(20, 20, 20, 20)
-
-            addView(TextView(this@MainActivity).apply {
-                text = title
-                textSize = 16f
-                setPadding(0, 0, 0, 12)
-            })
-        }
-    }
-
-    private fun createButton(text: String, onClick: () -> Unit): Button {
-        return Button(this).apply {
-            this.text = text
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                setMargins(0, 4, 0, 4)
-            }
-            setOnClickListener { onClick() }
-        }
-    }
-
     private fun log(msg: String) {
         tvLog.append("$msg\n")
-        logScrollView.post { logScrollView.fullScroll(ScrollView.FOCUS_DOWN) }
         android.util.Log.d("AwStoreDemo", msg)
     }
 
