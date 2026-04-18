@@ -8,7 +8,8 @@
 
 - **属性委托语法**：`by string()` / `by int()` / `by boolean()` … 声明即存储
 - **Key 自动推断**：省略 key 参数，自动使用属性名作为键名
-- **15+ 数据类型**：String、Int、Long、Float、Double、Boolean、ByteArray、Set\<String\>、Parcelable、Serializable、JSON 对象，以及对应的 Nullable 版本
+- **19+ 数据类型**：String、Int、Long、Float、Double、Boolean、ByteArray、Set\<String\>、Parcelable、Serializable、JSON 对象，以及对应的 Nullable 版本（nullableStringSet）
+- **命令式 API**：`getString()` / `putString()` 等命令式读写，适用于动态 key 场景
 - **安全加密**：`CryptKey` 安全包装 + AES-CFB 加密，`CryptKey.fromSecureRandom()` 引导安全实践
 - **多实例隔离**：通过 `mmapId` 创建独立存储文件
 - **多进程模式**：`multiProcess = true` 启用跨进程读写一致性
@@ -18,7 +19,8 @@
 - **自动初始化**：内置 ContentProvider，零配置接入
 - **同步/异步写入**：`sync()` / `async()` 控制写入策略
 - **reified 泛型**：`parcelable<T>()` / `serializable<T>()` / `json<T>()` 简化用法
-- **调试日志**：可选日志输出，方便排查问题
+- **操作符语法**：`"key" in store` 检查键是否存在，`remove("a", "b")` 批量删除
+- **调试日志**：可选日志输出（d/i/w/e 四级），方便排查问题
 
 ## 引入
 
@@ -107,10 +109,31 @@ object UserStore : MmkvDelegate() {
     var enabled by nullableBoolean()  // null = key不存在, false = 值为false
     var data by nullableBytes()
     var nickname by nullableString()
+    var tags by nullableStringSet()   // null = key不存在, emptySet = 值为空集合
 }
 ```
 
 > 赋值 `null` 时自动删除对应键。
+
+## 命令式 API
+
+除了属性委托，还提供命令式 get/put 方法，适用于动态 key 场景：
+
+```kotlin
+// 基本类型
+UserStore.putString("dynamic_key", "value")
+val value = UserStore.getString("dynamic_key")
+
+UserStore.putInt("counter", 42)
+val counter = UserStore.getInt("counter")
+
+// 其他类型同理：putLong/getLong, putFloat/getFloat, putDouble/getDouble,
+// putBoolean/getBoolean, putBytes/getBytes, putStringSet/getStringSet
+
+// JSON 对象
+UserStore.putJson("profile", userProfile)
+val profile = UserStore.getJson<UserProfile>("profile")
+```
 
 ## 加密存储
 
@@ -123,6 +146,8 @@ object SecureStore : MmkvDelegate(
     var password by string()
 }
 ```
+
+> **重要**：`CryptKey.fromSecureRandom()` 应在 `object` 声明中使用，确保只初始化一次。避免在函数中重复调用，否则每次会生成不同密钥导致数据无法读取。
 
 ### 从字符串/字节数组创建
 
@@ -183,7 +208,7 @@ object DataStore : MmkvDelegate() {
 }
 ```
 
-> 利用 MMKV 原生 Serializable 支持，零额外依赖。
+> ⚠️ Java 序列化性能较差且存在兼容性风险，推荐优先使用 `parcelable` 或 `json` 委托。
 
 ## JSON 对象存储
 
@@ -224,6 +249,9 @@ SpMigration.migrate(this, "app_prefs", mmapId = "user_store")
 // 迁移到加密实例
 SpMigration.migrate(this, "app_prefs", cryptKey = "secret")
 
+// 迁移到 CryptKey 加密实例
+SpMigration.migrate(this, "app_prefs", secureCryptKey = CryptKey.fromSecureRandom())
+
 // 迁移到多进程实例
 SpMigration.migrate(this, "app_prefs", mmapId = "shared", multiProcess = true)
 
@@ -237,7 +265,7 @@ SpMigration.migrate(this, "app_prefs", deleteAfterMigration = false)
 data class MigrationResult(
     val totalKeys: Int,       // SP 中总键数
     val successCount: Int,    // 成功迁移数
-    val failedCount: Int,     // 失败数
+    val failedCount: Int,     // 失败数（= totalKeys - successCount - skippedKeys.size）
     val skippedKeys: List<String>  // 跳过的键（null 值）
 )
 ```
@@ -271,8 +299,9 @@ UserStore.unregisterAllContentChange()
 ## 工具方法
 
 ```kotlin
-// 检查键是否存在
+// 检查键是否存在（支持操作符语法）
 UserStore.contains("token")       // Boolean
+"token" in UserStore              // 等价写法
 
 // 获取所有键名
 UserStore.allKeys()                // Array<String>
@@ -280,8 +309,8 @@ UserStore.allKeys()                // Array<String>
 // 删除单个键
 UserStore.remove("token")
 
-// 批量删除
-UserStore.remove(arrayOf("token", "userId"))
+// 批量删除（vararg 语法）
+UserStore.remove("token", "userId")
 
 // 清空所有数据
 UserStore.clear()
@@ -289,12 +318,28 @@ UserStore.clear()
 // 存储文件大小（字节）
 UserStore.totalSize()              // Long
 
-// 同步写入（等待写入磁盘完成）
+// 同步写入（等待写入磁盘完成，适用于关键数据）
 UserStore.sync()
 
-// 异步写入（立即返回，后台写入）
+// 异步写入（立即返回，后台写入，适用于非关键数据）
 UserStore.async()
 ```
+
+## 调试日志
+
+```kotlin
+// 在 Application.onCreate() 中启用
+AwStoreLogger.enabled = BuildConfig.DEBUG
+```
+
+启用后，库会输出以下级别的日志（Tag: `AwStore`）：
+
+| 方法 | 级别 | 用途 |
+|------|------|------|
+| `AwStoreLogger.d(msg)` | DEBUG | 初始化、迁移等常规日志 |
+| `AwStoreLogger.i(msg)` | INFO | 重要操作信息 |
+| `AwStoreLogger.w(msg)` | WARN | 警告信息 |
+| `AwStoreLogger.e(msg, t?)` | ERROR | 错误信息 |
 
 ## 全局配置
 
@@ -303,7 +348,7 @@ UserStore.async()
 | 自动初始化 | 内置 ContentProvider | 引入即用，无需手动调用 |
 | 手动初始化 | `AwStore.init(context)` | 需自定义目录时使用 |
 | 自定义目录 | `AwStore.init(context, rootDir)` | 指定 MMKV 文件存储根目录 |
-| 调试日志 | `AwStoreLogger.enabled = BuildConfig.DEBUG` | 开启后输出迁移、初始化等日志 |
+| 调试日志 | `AwStoreLogger.enabled = BuildConfig.DEBUG` | 开启后输出 d/i/w/e 四级日志 |
 | 存储根目录 | `AwStore.rootDir` | 获取当前 MMKV 根目录路径 |
 | JSON 适配器 | `AwStoreJsonAdapter.setAdapter(adapter)` | 使用 json() 委托前必须设置 |
 
@@ -319,9 +364,11 @@ UserStore.async()
 - **Key 自动推断**：省略 key 时使用属性名，重命名属性会导致 key 变化（旧数据需迁移）
 - **StringSet 不可变性**：`stringSet` 返回的是不可变集合，修改时需创建新集合并重新赋值
 - **Nullable 类型**：`nullableXxx()` 委托赋值 `null` 时会删除对应键，读取不存在的键返回 `null`
-- **CryptKey 安全**：`CryptKey.fromSecureRandom()` 每次安装生成不同密钥，卸载重装后之前加密的数据将无法解密
+- **CryptKey 安全**：`CryptKey.fromSecureRandom()` 应在 `object` 声明中使用，确保只初始化一次；每次安装生成不同密钥，卸载重装后之前加密的数据将无法解密
+- **Serializable 风险**：Java 序列化性能较差且存在兼容性风险，推荐优先使用 `parcelable` 或 `json`
 - **ProGuard**：库已内置 consumer ProGuard 规则，无需额外配置
 - **多进程**：使用 `multiProcess = true` 启用多进程模式
+- **sync vs async**：`sync()` 等待数据写入磁盘完成后再返回，适用于关键数据；`async()` 立即返回在后台写入，适用于非关键数据
 
 ## 许可证
 

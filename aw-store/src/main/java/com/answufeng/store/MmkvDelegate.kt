@@ -3,6 +3,8 @@ package com.answufeng.store
 import android.os.Parcelable
 import com.tencent.mmkv.MMKV
 import com.tencent.mmkv.MMKVContentChangeNotification
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.properties.ReadWriteProperty
 import kotlin.reflect.KClass
 import kotlin.reflect.KProperty
@@ -85,12 +87,12 @@ open class MmkvDelegate(
     }
 
     /** 批量删除指定 [keys] 对应的键值对 */
-    fun remove(keys: Array<String>) {
+    fun remove(vararg keys: String) {
         mmkv.removeValuesForKeys(keys)
     }
 
-    /** 检查指定 [key] 是否存在 */
-    fun contains(key: String): Boolean = mmkv.containsKey(key)
+    /** 检查指定 [key] 是否存在，支持 `key in store` 语法 */
+    operator fun contains(key: String): Boolean = mmkv.containsKey(key)
 
     /** 获取所有键名，如果为空返回空数组 */
     fun allKeys(): Array<String> = mmkv.allKeys() ?: emptyArray()
@@ -108,7 +110,68 @@ open class MmkvDelegate(
         mmkv.async()
     }
 
-    private val contentChangeListeners = mutableMapOf<String, MutableList<(String) -> Unit>>()
+    fun getString(key: String, default: String = ""): String = mmkv.decodeString(key, default) ?: default
+
+    fun putString(key: String, value: String) {
+        mmkv.encode(key, value)
+    }
+
+    fun getInt(key: String, default: Int = 0): Int = mmkv.decodeInt(key, default)
+
+    fun putInt(key: String, value: Int) {
+        mmkv.encode(key, value)
+    }
+
+    fun getLong(key: String, default: Long = 0L): Long = mmkv.decodeLong(key, default)
+
+    fun putLong(key: String, value: Long) {
+        mmkv.encode(key, value)
+    }
+
+    fun getFloat(key: String, default: Float = 0f): Float = mmkv.decodeFloat(key, default)
+
+    fun putFloat(key: String, value: Float) {
+        mmkv.encode(key, value)
+    }
+
+    fun getDouble(key: String, default: Double = 0.0): Double = mmkv.decodeDouble(key, default)
+
+    fun putDouble(key: String, value: Double) {
+        mmkv.encode(key, value)
+    }
+
+    fun getBoolean(key: String, default: Boolean = false): Boolean = mmkv.decodeBool(key, default)
+
+    fun putBoolean(key: String, value: Boolean) {
+        mmkv.encode(key, value)
+    }
+
+    fun getBytes(key: String, default: ByteArray = byteArrayOf()): ByteArray = mmkv.decodeBytes(key, default) ?: default
+
+    fun putBytes(key: String, value: ByteArray) {
+        mmkv.encode(key, value)
+    }
+
+    fun getStringSet(key: String, default: Set<String> = emptySet()): Set<String> = mmkv.decodeStringSet(key, default) ?: default
+
+    fun putStringSet(key: String, value: Set<String>) {
+        mmkv.encode(key, value)
+    }
+
+    fun <T : Any> getJson(key: String, clazz: KClass<T>): T? {
+        val str = mmkv.decodeString(key, null) ?: return null
+        return AwStoreJsonAdapter.fromJson(str, clazz)
+    }
+
+    fun <T : Any> putJson(key: String, value: T, clazz: KClass<T> = value::class as KClass<T>) {
+        mmkv.encode(key, AwStoreJsonAdapter.toJson(value, clazz))
+    }
+
+    inline fun <reified T : Any> getJson(key: String): T? = getJson(key, T::class)
+
+    inline fun <reified T : Any> putJson(key: String, value: T) = putJson(key, value, T::class)
+
+    private val contentChangeListeners = ConcurrentHashMap<String, CopyOnWriteArrayList<(String) -> Unit>>()
 
     @Volatile
     private var globalNotificationRegistered = false
@@ -133,7 +196,7 @@ open class MmkvDelegate(
         listener: (mmapID: String) -> Unit
     ) {
         val id = targetMmapId ?: effectiveMmapId
-        contentChangeListeners.getOrPut(id) { mutableListOf() }.add(listener)
+        contentChangeListeners.getOrPut(id) { CopyOnWriteArrayList() }.add(listener)
         if (!globalNotificationRegistered) {
             synchronized(this) {
                 if (!globalNotificationRegistered) {
@@ -446,6 +509,26 @@ open class MmkvDelegate(
     }
 
     /**
+     * Nullable Set\<String\> 类型属性委托。
+     *
+     * key 不存在时返回 null，赋值 null 时删除对应键。
+     * 可区分"key 不存在"和"值为空集合"的场景。
+     *
+     * @param key MMKV 键名，为 null 时自动使用属性名
+     */
+    fun nullableStringSet(key: String? = null) = object : ReadWriteProperty<Any?, Set<String>?> {
+        override fun getValue(thisRef: Any?, property: KProperty<*>): Set<String>? {
+            val k = key ?: property.name
+            return if (mmkv.containsKey(k)) mmkv.decodeStringSet(k) else null
+        }
+
+        override fun setValue(thisRef: Any?, property: KProperty<*>, value: Set<String>?) {
+            val k = key ?: property.name
+            if (value != null) mmkv.encode(k, value) else mmkv.removeValueForKey(k)
+        }
+    }
+
+    /**
      * Parcelable 类型属性委托。
      *
      * 返回可空类型，赋值 null 时自动删除对应键。
@@ -509,16 +592,20 @@ open class MmkvDelegate(
         override fun getValue(thisRef: Any?, property: KProperty<*>): T? {
             val k = key ?: property.name
             val bytes = mmkv.decodeBytes(k) ?: return default
-            val ois = java.io.ObjectInputStream(java.io.ByteArrayInputStream(bytes))
-            return ois.readObject() as? T
+            return java.io.ByteArrayInputStream(bytes).use { bis ->
+                java.io.ObjectInputStream(bis).use { ois ->
+                    ois.readObject() as? T
+                }
+            }
         }
 
         override fun setValue(thisRef: Any?, property: KProperty<*>, value: T?) {
             val k = key ?: property.name
             if (value != null) {
                 val bos = java.io.ByteArrayOutputStream()
-                val oos = java.io.ObjectOutputStream(bos)
-                oos.writeObject(value)
+                java.io.ObjectOutputStream(bos).use { oos ->
+                    oos.writeObject(value)
+                }
                 mmkv.encode(k, bos.toByteArray())
             } else {
                 mmkv.removeValueForKey(k)
@@ -564,7 +651,7 @@ open class MmkvDelegate(
         override fun setValue(thisRef: Any?, property: KProperty<*>, value: T?) {
             val k = key ?: property.name
             if (value != null) {
-                mmkv.encode(k, AwStoreJsonAdapter.toJson(value, value::class as KClass<T>))
+                mmkv.encode(k, AwStoreJsonAdapter.toJson(value, clazz))
             } else {
                 mmkv.removeValueForKey(k)
             }

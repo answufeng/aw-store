@@ -21,6 +21,16 @@ object AwStoreLogger {
         if (enabled) Log.d("AwStore", msg)
     }
 
+    /** 输出 INFO 级别日志 */
+    fun i(msg: String) {
+        if (enabled) Log.i("AwStore", msg)
+    }
+
+    /** 输出 WARN 级别日志 */
+    fun w(msg: String, t: Throwable? = null) {
+        if (enabled) Log.w("AwStore", msg, t)
+    }
+
     /** 输出 ERROR 级别日志 */
     fun e(msg: String, t: Throwable? = null) {
         if (enabled) Log.e("AwStore", msg, t)

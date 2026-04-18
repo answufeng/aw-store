@@ -29,6 +29,7 @@
         style="@style/Card.AwStore">
 
         <ScrollView
+            android:id="@+id/scrollView"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:padding="16dp">
@@ -56,7 +57,7 @@
                             android:layout_height="wrap_content"
                             android:text="操作日志"
                             style="@style/Text.AwStore.Subtitle"
-                            android:layout_marginBottom="8dp" />
+                            android:layout_marginBottom="4dp" />
 
                         <TextView
                             android:layout_width="match_parent"
@@ -68,7 +69,7 @@
                         <ScrollView
                             android:id="@+id/logScrollView"
                             android:layout_width="match_parent"
-                            android:layout_height="160dp"
+                            android:layout_height="180dp"
                             android:background="@color/log_background"
                             android:padding="8dp">
 
@@ -117,7 +118,7 @@
                             style="@style/MaterialButton.AwStore.Outlined"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:text="写入基本值(6种类型)"
+                            android:text="写入基本值(7种类型)"
                             android:layout_marginBottom="8dp" />
 
                         <com.google.android.material.button.MaterialButton
@@ -139,7 +140,7 @@
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
-                                android:text="设置可空字符串为null"
+                                android:text="可空字符串=null"
                                 android:layout_marginEnd="4dp" />
 
                             <com.google.android.material.button.MaterialButton
@@ -148,10 +149,56 @@
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
-                                android:text="设置可空整型为null"
+                                android:text="可空整型=null"
                                 android:layout_marginStart="4dp" />
 
                         </LinearLayout>
+
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- 复杂类型卡片 -->
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="16dp"
+                    style="@style/Card.AwStore">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="复杂类型"
+                            style="@style/Text.AwStore.Subtitle"
+                            android:layout_marginBottom="12dp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnParcelable"
+                            style="@style/MaterialButton.AwStore.Outlined"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Parcelable 存储"
+                            android:layout_marginBottom="8dp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnBytes"
+                            style="@style/MaterialButton.AwStore.Outlined"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="ByteArray 存储"
+                            android:layout_marginBottom="8dp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnNullableStringSet"
+                            style="@style/MaterialButton.AwStore.Outlined"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Nullable StringSet 存储" />
 
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
@@ -197,7 +244,7 @@
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
                                 android:text="多实例隔离存储"
-                                android:layout_marginHorizontal="4dp" />
+                                android:layout_marginStart="4dp" />
 
                         </LinearLayout>
 
@@ -235,6 +282,62 @@
                             android:layout_marginTop="8dp"
                             android:text="注册内容变化监听" />
 
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:layout_marginTop="8dp">
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnSync"
+                                style="@style/MaterialButton.AwStore.Text"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="同步写入(sync)"
+                                android:layout_marginEnd="4dp" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnAsync"
+                                style="@style/MaterialButton.AwStore.Text"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="异步写入(async)"
+                                android:layout_marginStart="4dp" />
+
+                        </LinearLayout>
+
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- 命令式 API 卡片 -->
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="16dp"
+                    style="@style/Card.AwStore">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="命令式 API"
+                            style="@style/Text.AwStore.Subtitle"
+                            android:layout_marginBottom="12dp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnImperativeApi"
+                            style="@style/MaterialButton.AwStore.Outlined"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="getString/putString 演示" />
+
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
@@ -262,7 +365,15 @@
                             style="@style/MaterialButton.AwStore.Outlined"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:text="Contains/AllKeys/Remove"
+                            android:text="Contains/AllKeys/Remove/In操作符"
+                            android:layout_marginBottom="8dp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnTotalSize"
+                            style="@style/MaterialButton.AwStore.Outlined"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="存储文件大小(totalSize)"
                             android:layout_marginBottom="8dp" />
 
                         <com.google.android.material.button.MaterialButton

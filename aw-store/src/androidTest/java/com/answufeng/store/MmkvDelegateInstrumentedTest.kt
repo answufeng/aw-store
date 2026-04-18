@@ -360,4 +360,46 @@ class MmkvDelegateInstrumentedTest {
         store.unregisterContentChange(listener)
         store.clear()
     }
+
+    @Test
+    fun nullableStringSetDelegate() {
+        val delegate = object : MmkvDelegate(mmapId = "test_nullable_set_${System.nanoTime()}") {
+            var tags by nullableStringSet()
+        }
+        assertNull(delegate.tags)
+        delegate.tags = setOf("kotlin", "android")
+        assertEquals(setOf("kotlin", "android"), delegate.tags)
+        delegate.tags = null
+        assertNull(delegate.tags)
+        assertFalse(delegate.contains("tags"))
+        delegate.clear()
+    }
+
+    @Test
+    fun removeVarargDeletesMultipleKeys() {
+        val delegate = object : MmkvDelegate(mmapId = "test_remove_vararg_${System.nanoTime()}") {
+            var name by string("name", "")
+            var age by int("age", 0)
+            var score by float("score", 0f)
+        }
+        delegate.name = "test"
+        delegate.age = 25
+        delegate.score = 95.5f
+        delegate.remove("name", "age")
+        assertEquals("", delegate.name)
+        assertEquals(0, delegate.age)
+        assertEquals(95.5f, delegate.score, 0.001f)
+        delegate.clear()
+    }
+
+    @Test
+    fun operatorContainsSyntax() {
+        val delegate = object : MmkvDelegate(mmapId = "test_op_contains_${System.nanoTime()}") {
+            var name by string("name", "")
+        }
+        assertFalse("name" in delegate)
+        delegate.name = "test"
+        assertTrue("name" in delegate)
+        delegate.clear()
+    }
 }

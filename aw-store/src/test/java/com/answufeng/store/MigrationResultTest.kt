@@ -38,4 +38,11 @@ class MigrationResultTest {
         val result = MigrationResult(0, 0, 0, emptyList())
         assertTrue(result.isSuccess)
     }
+
+    @Test
+    fun `failedCount calculated from total success and skipped`() {
+        val result = MigrationResult(10, 7, 2, listOf("null_key"))
+        assertFalse(result.isSuccess)
+        assertEquals(2, result.failedCount)
+    }
 }

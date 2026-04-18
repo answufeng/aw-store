@@ -23,6 +23,24 @@
     public *** registerContentChange(...);
     public *** unregisterContentChange(...);
     public *** unregisterAllContentChange(...);
+    public *** getString(...);
+    public *** putString(...);
+    public *** getInt(...);
+    public *** putInt(...);
+    public *** getLong(...);
+    public *** putLong(...);
+    public *** getFloat(...);
+    public *** putFloat(...);
+    public *** getDouble(...);
+    public *** putDouble(...);
+    public *** getBoolean(...);
+    public *** putBoolean(...);
+    public *** getBytes(...);
+    public *** putBytes(...);
+    public *** getStringSet(...);
+    public *** putStringSet(...);
+    public *** getJson(...);
+    public *** putJson(...);
 }
 
 # SpMigration

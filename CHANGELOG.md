@@ -10,10 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial release of aw-store
 - Kotlin property delegate API based on MMKV
-- 9 data types: String, Int, Long, Float, Double, Boolean, ByteArray, Set\<String\>, Parcelable
+- 11 base data types: String, Int, Long, Float, Double, Boolean, ByteArray, Set\<String\>, Parcelable, Serializable, JSON
+- 8 nullable delegates: nullableString, nullableInt, nullableLong, nullableFloat, nullableDouble, nullableBoolean, nullableBytes, nullableStringSet
 - `nullableString()` delegate for null-aware string storage
 - Multi-instance isolation via `mmapId`
-- AES-CFB encryption via `cryptKey`
+- AES-CFB encryption via `cryptKey` and `CryptKey`
 - `SpMigration.migrate()` with `MigrationResult` for SharedPreferences migration
 - `registerContentChange()` / `unregisterContentChange()` for data change listening
 - `sync()` / `async()` for write strategy control

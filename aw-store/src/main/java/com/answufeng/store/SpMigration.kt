@@ -25,7 +25,8 @@ object SpMigration {
      * @param context 任意 Context
      * @param spName SharedPreferences 文件名
      * @param mmapId 目标 MMKV 实例 ID，为 null 时使用默认实例
-     * @param cryptKey 目标 MMKV 的加密密钥，为 null 时不加密
+     * @param cryptKey 目标 MMKV 的加密密钥字符串，为 null 时不加密
+     * @param secureCryptKey 目标 MMKV 的安全加密密钥，优先级高于 [cryptKey]
      * @param multiProcess 是否使用多进程模式，默认 false
      * @param deleteAfterMigration 迁移成功后是否清除原 SP 数据，默认 true
      * @return [MigrationResult] 迁移结果
@@ -35,6 +36,7 @@ object SpMigration {
         spName: String,
         mmapId: String? = null,
         cryptKey: String? = null,
+        secureCryptKey: CryptKey? = null,
         multiProcess: Boolean = false,
         deleteAfterMigration: Boolean = true
     ): MigrationResult {
@@ -44,16 +46,18 @@ object SpMigration {
         val all = sp.all
         if (all.isNullOrEmpty()) return MigrationResult(0, 0, 0, emptyList())
 
-        val mmkv = resolveMmkv(mmapId, cryptKey, multiProcess)
+        val effectiveCryptKey = secureCryptKey?.value ?: cryptKey
+        val mmkv = resolveMmkv(mmapId, effectiveCryptKey, multiProcess)
 
         val importedCount = mmkv.importFromSharedPreferences(sp)
         val skippedKeys = all.filter { it.value == null }.keys.toList()
+        val failedCount = all.size - importedCount - skippedKeys.size
 
         if (deleteAfterMigration) {
             sp.edit().clear().apply()
         }
 
-        val result = MigrationResult(all.size, importedCount, 0, skippedKeys)
+        val result = MigrationResult(all.size, importedCount, failedCount, skippedKeys)
         AwStoreLogger.d("SpMigration: $result")
         return result
     }
