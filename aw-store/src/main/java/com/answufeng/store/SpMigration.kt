@@ -54,12 +54,33 @@ object SpMigration {
         val failedCount = all.size - importedCount - skippedKeys.size
 
         if (deleteAfterMigration) {
-            sp.edit().clear().apply()
+            sp.edit().clear().commit()
         }
 
         val result = MigrationResult(all.size, importedCount, failedCount, skippedKeys)
         AwStoreLogger.d("SpMigration: $result")
         return result
+    }
+
+    /**
+     * 批量迁移多个 SharedPreferences 文件到 MMKV。
+     *
+     * 每个 SP 文件迁移到对应的 MMKV 实例（mmapId 默认等于 spName）。
+     * 如果某个 SP 文件迁移失败，不影响其他文件的迁移。
+     *
+     * @param context 任意 Context
+     * @param spNames SharedPreferences 文件名列表
+     * @param deleteAfterMigration 迁移成功后是否清除原 SP 数据，默认 true
+     * @return 每个 SP 文件的迁移结果列表，顺序与 [spNames] 一致
+     */
+    fun migrateAll(
+        context: Context,
+        spNames: List<String>,
+        deleteAfterMigration: Boolean = true
+    ): List<MigrationResult> {
+        return spNames.map { spName ->
+            migrate(context, spName, mmapId = spName, deleteAfterMigration = deleteAfterMigration)
+        }
     }
 
     /**

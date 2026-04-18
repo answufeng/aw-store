@@ -13,8 +13,9 @@ object AwStore {
      *
      * @param context 任意 Context（内部自动取 applicationContext）
      * @param rootDir 自定义存储根目录，为 null 时使用默认目录（`files/mmkv`）
+     * @param logEnabled 是否启用调试日志，默认 false
      */
-    fun init(context: Context, rootDir: String? = null) {
+    fun init(context: Context, rootDir: String? = null, logEnabled: Boolean = false) {
         if (initialized) return
         synchronized(this) {
             if (initialized) return
@@ -23,6 +24,7 @@ object AwStore {
             } else {
                 MMKV.initialize(context.applicationContext)
             }
+            AwStoreLogger.enabled = logEnabled
             initialized = true
             AwStoreLogger.d("AwStore.init: complete, rootDir=${MMKV.getRootDir()}")
         }

@@ -154,6 +154,14 @@
 
                         </LinearLayout>
 
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnNullableOthers"
+                            style="@style/MaterialButton.AwStore.Text"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="Nullable Long/Float/Double/Boolean" />
+
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
@@ -198,7 +206,15 @@
                             style="@style/MaterialButton.AwStore.Outlined"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:text="Nullable StringSet 存储" />
+                            android:text="Nullable StringSet 存储"
+                            android:layout_marginBottom="8dp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnJson"
+                            style="@style/MaterialButton.AwStore.Outlined"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="JSON 对象存储" />
 
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
@@ -280,7 +296,15 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="8dp"
-                            android:text="注册内容变化监听" />
+                            android:text="注册跨进程内容变化监听" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnOnKeyChanged"
+                            style="@style/MaterialButton.AwStore.Outlined"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="注册单进程键变更回调" />
 
                         <LinearLayout
                             android:layout_width="match_parent"
@@ -311,7 +335,7 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- 命令式 API 卡片 -->
+                <!-- 命令式 API & 便捷方法卡片 -->
                 <com.google.android.material.card.MaterialCardView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -327,7 +351,7 @@
                         <TextView
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:text="命令式 API"
+                            android:text="命令式 API & 便捷方法"
                             style="@style/Text.AwStore.Subtitle"
                             android:layout_marginBottom="12dp" />
 
@@ -336,7 +360,31 @@
                             style="@style/MaterialButton.AwStore.Outlined"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:text="getString/putString 演示" />
+                            android:text="getString/putString 演示"
+                            android:layout_marginBottom="8dp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnBatchWrite"
+                            style="@style/MaterialButton.AwStore.Outlined"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="批量写入事务(edit)"
+                            android:layout_marginBottom="8dp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnGetOrPut"
+                            style="@style/MaterialButton.AwStore.Outlined"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="getOrPut 便捷方法"
+                            android:layout_marginBottom="8dp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnExportImport"
+                            style="@style/MaterialButton.AwStore.Outlined"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="数据导出/导入" />
 
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
@@ -345,6 +393,7 @@
                 <com.google.android.material.card.MaterialCardView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:layout_marginBottom="16dp"
                     style="@style/Card.AwStore">
 
                     <LinearLayout
@@ -375,6 +424,28 @@
                             android:layout_height="wrap_content"
                             android:text="存储文件大小(totalSize)"
                             android:layout_marginBottom="8dp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnMmkvInstance"
+                            style="@style/MaterialButton.AwStore.Outlined"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="底层MMKV实例访问" />
+
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- 清除卡片 -->
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    style="@style/Card.AwStore">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
 
                         <com.google.android.material.button.MaterialButton
                             android:id="@+id/btnClearAll"

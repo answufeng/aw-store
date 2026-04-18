@@ -39,6 +39,7 @@ interface StoreJsonAdapter {
  */
 object AwStoreJsonAdapter : StoreJsonAdapter {
 
+    @Volatile
     private var impl: StoreJsonAdapter? = null
 
     /**

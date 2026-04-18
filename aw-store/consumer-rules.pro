@@ -13,6 +13,7 @@
 # MmkvDelegate
 -keep public class com.answufeng.store.MmkvDelegate {
     public <init>(...);
+    public *** mmkvInstance();
     public *** clear();
     public *** remove(...);
     public *** contains(...);
@@ -20,9 +21,13 @@
     public *** totalSize();
     public *** sync();
     public *** async();
+    public *** edit(...);
     public *** registerContentChange(...);
     public *** unregisterContentChange(...);
     public *** unregisterAllContentChange(...);
+    public *** onKeyChanged(...);
+    public *** removeOnKeyChanged(...);
+    public *** clearOnKeyChangedListeners(...);
     public *** getString(...);
     public *** putString(...);
     public *** getInt(...);
@@ -39,13 +44,29 @@
     public *** putBytes(...);
     public *** getStringSet(...);
     public *** putStringSet(...);
+    public *** getParcelable(...);
+    public *** putParcelable(...);
+    public *** getSerializable(...);
+    public *** putSerializable(...);
     public *** getJson(...);
     public *** putJson(...);
+    public *** getOrPutString(...);
+    public *** getOrPutInt(...);
+    public *** getOrPutLong(...);
+    public *** getOrPutBoolean(...);
+    public *** getOrPutFloat(...);
+    public *** getOrPutDouble(...);
+    public *** exportToMap(...);
+    public *** importFromMap(...);
 }
+
+# StoreConfig
+-keep public class com.answufeng.store.StoreConfig { *; }
 
 # SpMigration
 -keep public class com.answufeng.store.SpMigration {
     public *** migrate(...);
+    public *** migrateAll(...);
 }
 
 # MigrationResult
@@ -57,6 +78,13 @@
     public static *** fromBytes(...);
     public static *** fromSecureRandom(...);
 }
+
+# AwStoreLogger
+-keep public class com.answufeng.store.AwStoreLogger {
+    public *** enabled;
+    public static *** setLogger(...);
+}
+-keep public class com.answufeng.store.AwStoreLogger$Level { *; }
 
 # StoreJsonAdapter
 -keep public interface com.answufeng.store.StoreJsonAdapter { *; }
