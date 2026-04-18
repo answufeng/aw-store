@@ -151,6 +151,13 @@ object UserStore : MmkvDelegate() {
 
 > 赋值 `null` 时自动删除对应键。
 
+Nullable 委托还支持 `default` 参数，指定 key 不存在时的默认值：
+
+```kotlin
+var nickname by nullableString(default = "unknown")  // key不存在时返回"unknown"而非null
+var age by nullableInt(default = -1)                 // key不存在时返回-1而非null
+```
+
 ## 命令式 API
 
 除了属性委托，还提供命令式 get/put 方法，适用于动态 key 场景：
@@ -245,6 +252,18 @@ val key2 = CryptKey.fromBytes(byteArrayOf(0x01, 0x02))
 object UserStore : MmkvDelegate() { ... }
 object ConfigStore : MmkvDelegate(mmapId = "config") { ... }
 object SecureStore : MmkvDelegate(secureCryptKey = CryptKey.fromSecureRandom()) { ... }
+```
+
+当配置参数较多时，可以使用 `StoreConfig` 数据类：
+
+```kotlin
+object SecureStore : MmkvDelegate(StoreConfig(
+    mmapId = "secure",
+    secureCryptKey = CryptKey.fromSecureRandom(),
+    multiProcess = true
+)) {
+    var password by string()
+}
 ```
 
 | 参数 | 说明 |
