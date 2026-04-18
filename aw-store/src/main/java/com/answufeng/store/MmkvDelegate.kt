@@ -497,6 +497,7 @@ open class MmkvDelegate(
         override fun setValue(thisRef: Any?, property: KProperty<*>, value: String) {
             val k = key ?: property.name
             mmkv.encode(k, value)
+            notifyKeyChanged(k)
         }
     }
 
@@ -519,6 +520,7 @@ open class MmkvDelegate(
             } else {
                 mmkv.removeValueForKey(k)
             }
+            notifyKeyChanged(k)
         }
     }
 
@@ -537,6 +539,7 @@ open class MmkvDelegate(
         override fun setValue(thisRef: Any?, property: KProperty<*>, value: Int) {
             val k = key ?: property.name
             mmkv.encode(k, value)
+            notifyKeyChanged(k)
         }
     }
 
@@ -558,6 +561,7 @@ open class MmkvDelegate(
         override fun setValue(thisRef: Any?, property: KProperty<*>, value: Int?) {
             val k = key ?: property.name
             if (value != null) mmkv.encode(k, value) else mmkv.removeValueForKey(k)
+            notifyKeyChanged(k)
         }
     }
 
@@ -576,6 +580,7 @@ open class MmkvDelegate(
         override fun setValue(thisRef: Any?, property: KProperty<*>, value: Long) {
             val k = key ?: property.name
             mmkv.encode(k, value)
+            notifyKeyChanged(k)
         }
     }
 
@@ -596,6 +601,7 @@ open class MmkvDelegate(
         override fun setValue(thisRef: Any?, property: KProperty<*>, value: Long?) {
             val k = key ?: property.name
             if (value != null) mmkv.encode(k, value) else mmkv.removeValueForKey(k)
+            notifyKeyChanged(k)
         }
     }
 
@@ -614,6 +620,7 @@ open class MmkvDelegate(
         override fun setValue(thisRef: Any?, property: KProperty<*>, value: Float) {
             val k = key ?: property.name
             mmkv.encode(k, value)
+            notifyKeyChanged(k)
         }
     }
 
@@ -634,6 +641,7 @@ open class MmkvDelegate(
         override fun setValue(thisRef: Any?, property: KProperty<*>, value: Float?) {
             val k = key ?: property.name
             if (value != null) mmkv.encode(k, value) else mmkv.removeValueForKey(k)
+            notifyKeyChanged(k)
         }
     }
 
@@ -652,6 +660,7 @@ open class MmkvDelegate(
         override fun setValue(thisRef: Any?, property: KProperty<*>, value: Double) {
             val k = key ?: property.name
             mmkv.encode(k, value)
+            notifyKeyChanged(k)
         }
     }
 
@@ -672,6 +681,7 @@ open class MmkvDelegate(
         override fun setValue(thisRef: Any?, property: KProperty<*>, value: Double?) {
             val k = key ?: property.name
             if (value != null) mmkv.encode(k, value) else mmkv.removeValueForKey(k)
+            notifyKeyChanged(k)
         }
     }
 
@@ -690,6 +700,7 @@ open class MmkvDelegate(
         override fun setValue(thisRef: Any?, property: KProperty<*>, value: Boolean) {
             val k = key ?: property.name
             mmkv.encode(k, value)
+            notifyKeyChanged(k)
         }
     }
 
@@ -711,6 +722,7 @@ open class MmkvDelegate(
         override fun setValue(thisRef: Any?, property: KProperty<*>, value: Boolean?) {
             val k = key ?: property.name
             if (value != null) mmkv.encode(k, value) else mmkv.removeValueForKey(k)
+            notifyKeyChanged(k)
         }
     }
 
@@ -729,6 +741,7 @@ open class MmkvDelegate(
         override fun setValue(thisRef: Any?, property: KProperty<*>, value: ByteArray) {
             val k = key ?: property.name
             mmkv.encode(k, value)
+            notifyKeyChanged(k)
         }
     }
 
@@ -749,6 +762,7 @@ open class MmkvDelegate(
         override fun setValue(thisRef: Any?, property: KProperty<*>, value: ByteArray?) {
             val k = key ?: property.name
             if (value != null) mmkv.encode(k, value) else mmkv.removeValueForKey(k)
+            notifyKeyChanged(k)
         }
     }
 
@@ -769,6 +783,7 @@ open class MmkvDelegate(
         override fun setValue(thisRef: Any?, property: KProperty<*>, value: Set<String>) {
             val k = key ?: property.name
             mmkv.encode(k, value)
+            notifyKeyChanged(k)
         }
     }
 
@@ -790,6 +805,7 @@ open class MmkvDelegate(
         override fun setValue(thisRef: Any?, property: KProperty<*>, value: Set<String>?) {
             val k = key ?: property.name
             if (value != null) mmkv.encode(k, value) else mmkv.removeValueForKey(k)
+            notifyKeyChanged(k)
         }
     }
 
@@ -820,6 +836,7 @@ open class MmkvDelegate(
             } else {
                 mmkv.removeValueForKey(k)
             }
+            notifyKeyChanged(k)
         }
     }
 
@@ -885,6 +902,7 @@ open class MmkvDelegate(
             } else {
                 mmkv.removeValueForKey(k)
             }
+            notifyKeyChanged(k)
         }
     }
 
@@ -930,6 +948,7 @@ open class MmkvDelegate(
             } else {
                 mmkv.removeValueForKey(k)
             }
+            notifyKeyChanged(k)
         }
     }
 }
