@@ -186,75 +186,99 @@ open class MmkvDelegate(
         (keysAfter + keysBefore).forEach { notifyKeyChanged(it) }
     }
 
+    /** 读取字符串值。 */
     fun getString(key: String, default: String = ""): String = mmkv.decodeString(key, default) ?: default
 
+    /** 写入字符串值，写入后触发键变更通知。 */
     fun putString(key: String, value: String) {
         mmkv.encode(key, value)
         notifyKeyChanged(key)
     }
 
+    /** 读取整数值。 */
     fun getInt(key: String, default: Int = 0): Int = mmkv.decodeInt(key, default)
 
+    /** 写入整数值，写入后触发键变更通知。 */
     fun putInt(key: String, value: Int) {
         mmkv.encode(key, value)
         notifyKeyChanged(key)
     }
 
+    /** 读取长整数值。 */
     fun getLong(key: String, default: Long = 0L): Long = mmkv.decodeLong(key, default)
 
+    /** 写入长整数值，写入后触发键变更通知。 */
     fun putLong(key: String, value: Long) {
         mmkv.encode(key, value)
         notifyKeyChanged(key)
     }
 
+    /** 读取浮点数值。 */
     fun getFloat(key: String, default: Float = 0f): Float = mmkv.decodeFloat(key, default)
 
+    /** 写入浮点数值，写入后触发键变更通知。 */
     fun putFloat(key: String, value: Float) {
         mmkv.encode(key, value)
         notifyKeyChanged(key)
     }
 
+    /** 读取双精度浮点数值。 */
     fun getDouble(key: String, default: Double = 0.0): Double = mmkv.decodeDouble(key, default)
 
+    /** 写入双精度浮点数值，写入后触发键变更通知。 */
     fun putDouble(key: String, value: Double) {
         mmkv.encode(key, value)
         notifyKeyChanged(key)
     }
 
+    /** 读取布尔值。 */
     fun getBoolean(key: String, default: Boolean = false): Boolean = mmkv.decodeBool(key, default)
 
+    /** 写入布尔值，写入后触发键变更通知。 */
     fun putBoolean(key: String, value: Boolean) {
         mmkv.encode(key, value)
         notifyKeyChanged(key)
     }
 
+    /** 读取字节数组。 */
     fun getBytes(key: String, default: ByteArray = emptyByteArray): ByteArray = mmkv.decodeBytes(key, default) ?: default
 
+    /** 写入字节数组，写入后触发键变更通知。 */
     fun putBytes(key: String, value: ByteArray) {
         mmkv.encode(key, value)
         notifyKeyChanged(key)
     }
 
+    /** 读取字符串集合。 */
     fun getStringSet(key: String, default: Set<String> = emptySet()): Set<String> = mmkv.decodeStringSet(key, default) ?: default
 
+    /** 写入字符串集合，写入后触发键变更通知。 */
     fun putStringSet(key: String, value: Set<String>) {
         mmkv.encode(key, value)
         notifyKeyChanged(key)
     }
 
+    /** 读取 Parcelable 对象。 */
     fun <T : Parcelable> getParcelable(key: String, clazz: Class<T>, default: T? = null): T? {
         return mmkv.decodeParcelable(key, clazz, default)
     }
 
+    /** 读取 Parcelable 对象（reified 泛型版本）。 */
     inline fun <reified T : Parcelable> getParcelable(key: String, default: T? = null): T? {
         return getParcelable(key, T::class.java, default)
     }
 
+    /** 写入 Parcelable 对象，写入后触发键变更通知。 */
     fun <T : Parcelable> putParcelable(key: String, value: T) {
         mmkv.encode(key, value)
         notifyKeyChanged(key)
     }
 
+    /**
+     * 读取 Serializable 对象。
+     *
+     * 注意：Java 序列化性能较差且存在兼容性风险，推荐使用 [parcelable] 或 [json] 替代。
+     */
     inline fun <reified T : java.io.Serializable> getSerializable(key: String, default: T? = null): T? {
         val bytes = mmkv.decodeBytes(key) ?: return default
         return try {
@@ -269,6 +293,7 @@ open class MmkvDelegate(
         }
     }
 
+    /** 写入 Serializable 对象，写入后触发键变更通知。推荐使用 [putParcelable] 或 [putJson] 替代。 */
     fun <T : java.io.Serializable> putSerializable(key: String, value: T) {
         val bos = java.io.ByteArrayOutputStream()
         java.io.ObjectOutputStream(bos).use { oos ->
@@ -278,6 +303,11 @@ open class MmkvDelegate(
         notifyKeyChanged(key)
     }
 
+    /**
+     * 读取字符串值，若 key 不存在则写入 [defaultValue] 并返回。
+     *
+     * 写入后会触发键变更通知。
+     */
     fun getOrPutString(key: String, defaultValue: () -> String): String {
         if (!mmkv.containsKey(key)) {
             val value = defaultValue()
@@ -288,6 +318,7 @@ open class MmkvDelegate(
         return mmkv.decodeString(key, "") ?: ""
     }
 
+    /** 读取整数值，若 key 不存在则写入 [defaultValue] 并返回。写入后触发键变更通知。 */
     fun getOrPutInt(key: String, defaultValue: () -> Int): Int {
         if (!mmkv.containsKey(key)) {
             val value = defaultValue()
@@ -298,6 +329,7 @@ open class MmkvDelegate(
         return mmkv.decodeInt(key, 0)
     }
 
+    /** 读取长整数值，若 key 不存在则写入 [defaultValue] 并返回。写入后触发键变更通知。 */
     fun getOrPutLong(key: String, defaultValue: () -> Long): Long {
         if (!mmkv.containsKey(key)) {
             val value = defaultValue()
@@ -308,6 +340,7 @@ open class MmkvDelegate(
         return mmkv.decodeLong(key, 0L)
     }
 
+    /** 读取布尔值，若 key 不存在则写入 [defaultValue] 并返回。写入后触发键变更通知。 */
     fun getOrPutBoolean(key: String, defaultValue: () -> Boolean): Boolean {
         if (!mmkv.containsKey(key)) {
             val value = defaultValue()
@@ -318,6 +351,7 @@ open class MmkvDelegate(
         return mmkv.decodeBool(key, false)
     }
 
+    /** 读取浮点数值，若 key 不存在则写入 [defaultValue] 并返回。写入后触发键变更通知。 */
     fun getOrPutFloat(key: String, defaultValue: () -> Float): Float {
         if (!mmkv.containsKey(key)) {
             val value = defaultValue()
@@ -328,6 +362,7 @@ open class MmkvDelegate(
         return mmkv.decodeFloat(key, 0f)
     }
 
+    /** 读取双精度浮点数值，若 key 不存在则写入 [defaultValue] 并返回。写入后触发键变更通知。 */
     fun getOrPutDouble(key: String, defaultValue: () -> Double): Double {
         if (!mmkv.containsKey(key)) {
             val value = defaultValue()

@@ -3,6 +3,20 @@ package com.answufeng.store
 import android.content.Context
 import com.tencent.mmkv.MMKV
 
+/**
+ * MMKV 存储库的全局入口。
+ *
+ * 负责初始化 MMKV 引擎，必须在 [android.app.Application.onCreate] 中调用 [init]。
+ *
+ * ```kotlin
+ * class MyApp : Application() {
+ *     override fun onCreate() {
+ *         super.onCreate()
+ *         AwStore.init(this, logEnabled = BuildConfig.DEBUG)
+ *     }
+ * }
+ * ```
+ */
 object AwStore {
 
     @Volatile
