@@ -53,7 +53,7 @@ object SpMigration {
         val skippedKeys = all.filter { it.value == null }.keys.toList()
         val failedCount = all.size - importedCount - skippedKeys.size
 
-        if (deleteAfterMigration) {
+        if (deleteAfterMigration && failedCount == 0) {
             sp.edit().clear().commit()
         }
 

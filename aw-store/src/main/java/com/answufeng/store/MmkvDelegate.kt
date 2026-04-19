@@ -106,18 +106,26 @@ open class MmkvDelegate(
      *
      * @param listener 回调函数，参数为变更的键名
      */
-    fun onKeyChanged(listener: (key: String) -> Unit) {
+    fun registerOnKeyChanged(listener: (key: String) -> Unit) {
         onKeyChangedListeners.add(listener)
     }
+
+    /** @suppress 使用 [registerOnKeyChanged] 替代 */
+    @Deprecated("Use registerOnKeyChanged instead", ReplaceWith("registerOnKeyChanged(listener)"))
+    fun onKeyChanged(listener: (key: String) -> Unit) = registerOnKeyChanged(listener)
 
     /**
      * 取消单进程内的键值变更回调。
      *
      * @param listener 要取消的回调函数
      */
-    fun removeOnKeyChanged(listener: (key: String) -> Unit) {
+    fun unregisterOnKeyChanged(listener: (key: String) -> Unit) {
         onKeyChangedListeners.remove(listener)
     }
+
+    /** @suppress 使用 [unregisterOnKeyChanged] 替代 */
+    @Deprecated("Use unregisterOnKeyChanged instead", ReplaceWith("unregisterOnKeyChanged(listener)"))
+    fun removeOnKeyChanged(listener: (key: String) -> Unit) = unregisterOnKeyChanged(listener)
 
     /**
      * 取消所有单进程内的键值变更回调。
@@ -180,10 +188,29 @@ open class MmkvDelegate(
      * ```
      */
     fun edit(block: MMKV.() -> Unit) {
-        val keysBefore = mmkv.allKeys()?.toSet() ?: emptySet()
-        mmkv.block()
-        val keysAfter = mmkv.allKeys()?.toSet() ?: emptySet()
-        (keysAfter + keysBefore).forEach { notifyKeyChanged(it) }
+        val changedKeys = mutableSetOf<String>()
+        val originalGetBoolean = mmkv::decodeBool
+        val originalGetInt = mmkv::decodeInt
+        val originalGetLong = mmkv::decodeLong
+        val originalGetFloat = mmkv::decodeFloat
+        val originalGetString = mmkv::decodeString
+        val originalGetBytes = mmkv::decodeBytes
+        val originalGetStringSet = mmkv::decodeStringSet
+
+        val trackingMmkv = object : MMKV by mmkv {
+            override fun encode(key: String, value: Boolean) { mmkv.encode(key, value); changedKeys.add(key) }
+            override fun encode(key: String, value: Int) { mmkv.encode(key, value); changedKeys.add(key) }
+            override fun encode(key: String, value: Long) { mmkv.encode(key, value); changedKeys.add(key) }
+            override fun encode(key: String, value: Float) { mmkv.encode(key, value); changedKeys.add(key) }
+            override fun encode(key: String, value: String?) { mmkv.encode(key, value); changedKeys.add(key) }
+            override fun encode(key: String, value: ByteArray?) { mmkv.encode(key, value); changedKeys.add(key) }
+            override fun encode(key: String, value: Set<String>?) { mmkv.encode(key, value); changedKeys.add(key) }
+            override fun removeValueForKey(key: String) { mmkv.removeValueForKey(key); changedKeys.add(key) }
+            override fun removeValuesForKeys(keys: Array<out String>) { mmkv.removeValuesForKeys(keys); changedKeys.addAll(keys) }
+            override fun clearAll() { mmkv.clearAll(); mmkv.allKeys()?.let { changedKeys.addAll(it) } }
+        }
+        trackingMmkv.block()
+        changedKeys.forEach { notifyKeyChanged(it) }
     }
 
     /** 读取字符串值。 */
