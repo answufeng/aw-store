@@ -25,6 +25,7 @@ object AwStoreLogger {
     }
 
     /** 是否启用日志输出，默认 `false` */
+    @Volatile
     var enabled: Boolean = false
 
     @Volatile

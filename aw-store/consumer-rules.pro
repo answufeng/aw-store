@@ -13,51 +13,7 @@
 # MmkvDelegate
 -keep public class com.answufeng.store.MmkvDelegate {
     public <init>(...);
-    public *** mmkvInstance();
-    public *** clear();
-    public *** remove(...);
-    public *** contains(...);
-    public *** allKeys();
-    public *** totalSize();
-    public *** sync();
-    public *** async();
-    public *** edit(...);
-    public *** registerContentChange(...);
-    public *** unregisterContentChange(...);
-    public *** unregisterAllContentChange(...);
-    public *** onKeyChanged(...);
-    public *** removeOnKeyChanged(...);
-    public *** clearOnKeyChangedListeners(...);
-    public *** getString(...);
-    public *** putString(...);
-    public *** getInt(...);
-    public *** putInt(...);
-    public *** getLong(...);
-    public *** putLong(...);
-    public *** getFloat(...);
-    public *** putFloat(...);
-    public *** getDouble(...);
-    public *** putDouble(...);
-    public *** getBoolean(...);
-    public *** putBoolean(...);
-    public *** getBytes(...);
-    public *** putBytes(...);
-    public *** getStringSet(...);
-    public *** putStringSet(...);
-    public *** getParcelable(...);
-    public *** putParcelable(...);
-    public *** getSerializable(...);
-    public *** putSerializable(...);
-    public *** getJson(...);
-    public *** putJson(...);
-    public *** getOrPutString(...);
-    public *** getOrPutInt(...);
-    public *** getOrPutLong(...);
-    public *** getOrPutBoolean(...);
-    public *** getOrPutFloat(...);
-    public *** getOrPutDouble(...);
-    public *** exportToMap(...);
-    public *** importFromMap(...);
+    public *;
 }
 
 # StoreConfig
@@ -95,6 +51,11 @@
 # AwStoreInitializer
 -keep public class com.answufeng.store.AwStoreInitializer { *; }
 
+# JSON data classes warning
+# If you use json<T>() delegate, make sure to keep your data classes:
+# -keep class com.yourpackage.YourDataClass { *; }
+# Or use @SerializedName (Gson) / @Json (Moshi) annotations
+
 # Parcelable CREATOR
 -keepclassmembers class * implements android.os.Parcelable {
     public static final ** CREATOR;
@@ -109,6 +70,11 @@
     private void readObject(java.io.ObjectInputStream);
     java.lang.Object writeReplace();
     java.lang.Object readResolve();
+}
+
+# Kotlin property delegate
+-keepclassmembers class * implements kotlin.properties.ReadWriteProperty {
+    *;
 }
 
 # Kotlin metadata

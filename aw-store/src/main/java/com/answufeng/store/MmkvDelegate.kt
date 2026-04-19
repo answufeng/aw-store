@@ -180,7 +180,10 @@ open class MmkvDelegate(
      * ```
      */
     fun edit(block: MMKV.() -> Unit) {
+        val keysBefore = mmkv.allKeys()?.toSet() ?: emptySet()
         mmkv.block()
+        val keysAfter = mmkv.allKeys()?.toSet() ?: emptySet()
+        (keysAfter + keysBefore).forEach { notifyKeyChanged(it) }
     }
 
     fun getString(key: String, default: String = ""): String = mmkv.decodeString(key, default) ?: default
@@ -279,6 +282,7 @@ open class MmkvDelegate(
         if (!mmkv.containsKey(key)) {
             val value = defaultValue()
             mmkv.encode(key, value)
+            notifyKeyChanged(key)
             return value
         }
         return mmkv.decodeString(key, "") ?: ""
@@ -288,6 +292,7 @@ open class MmkvDelegate(
         if (!mmkv.containsKey(key)) {
             val value = defaultValue()
             mmkv.encode(key, value)
+            notifyKeyChanged(key)
             return value
         }
         return mmkv.decodeInt(key, 0)
@@ -297,6 +302,7 @@ open class MmkvDelegate(
         if (!mmkv.containsKey(key)) {
             val value = defaultValue()
             mmkv.encode(key, value)
+            notifyKeyChanged(key)
             return value
         }
         return mmkv.decodeLong(key, 0L)
@@ -306,6 +312,7 @@ open class MmkvDelegate(
         if (!mmkv.containsKey(key)) {
             val value = defaultValue()
             mmkv.encode(key, value)
+            notifyKeyChanged(key)
             return value
         }
         return mmkv.decodeBool(key, false)
@@ -315,6 +322,7 @@ open class MmkvDelegate(
         if (!mmkv.containsKey(key)) {
             val value = defaultValue()
             mmkv.encode(key, value)
+            notifyKeyChanged(key)
             return value
         }
         return mmkv.decodeFloat(key, 0f)
@@ -324,6 +332,7 @@ open class MmkvDelegate(
         if (!mmkv.containsKey(key)) {
             val value = defaultValue()
             mmkv.encode(key, value)
+            notifyKeyChanged(key)
             return value
         }
         return mmkv.decodeDouble(key, 0.0)
