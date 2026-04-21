@@ -151,12 +151,25 @@ object UserStore : MmkvDelegate() {
 
 > 赋值 `null` 时自动删除对应键。
 
-Nullable 委托还支持 `default` 参数，指定 key 不存在时的默认值：
+Nullable 委托还支持 `default` 参数，指定 key 不存在时的返回值（区别于赋值为 `null` 的行为）：
 
 ```kotlin
-var nickname by nullableString(default = "unknown")  // key不存在时返回"unknown"而非null
-var age by nullableInt(default = -1)                 // key不存在时返回-1而非null
+var nickname by nullableString(default = "unknown")  // key不存在时返回"unknown"，赋null时删除key
+var age by nullableInt(default = -1)                 // key不存在时返回-1，赋null时删除key
+var enabled by nullableBoolean(default = true)       // key不存在时返回true，赋null时删除key
+var tags by nullableStringSet(default = setOf("default"))  // key不存在时返回默认集合
 ```
+
+| 委托方法 | key 不存在时 | 赋值 `null` 时 |
+|----------|-------------|---------------|
+| `nullableString(default)` | 返回 `default`（默认 null） | 删除 key，返回 `default` |
+| `nullableInt(default)` | 返回 `default`（默认 null） | 删除 key，返回 `default` |
+| `nullableLong(default)` | 返回 `default`（默认 null） | 删除 key，返回 `default` |
+| `nullableFloat(default)` | 返回 `default`（默认 null） | 删除 key，返回 `default` |
+| `nullableDouble(default)` | 返回 `default`（默认 null） | 删除 key，返回 `default` |
+| `nullableBoolean(default)` | 返回 `default`（默认 null） | 删除 key，返回 `default` |
+| `nullableBytes(default)` | 返回 `default`（默认 null） | 删除 key，返回 `default` |
+| `nullableStringSet(default)` | 返回 `default`（默认 null） | 删除 key，返回 `default` |
 
 ## 命令式 API
 
@@ -197,6 +210,7 @@ UserStore.edit {
 ```
 
 > MMKV 会自动将多次写入合并为一次写操作，提高写入效率。
+> `edit {}` 内部会追踪所有变更的 key，并在事务结束后触发 `registerOnKeyChanged` 回调。
 
 ## getOrPut 便捷方法
 

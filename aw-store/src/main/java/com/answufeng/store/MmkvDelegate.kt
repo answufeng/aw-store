@@ -139,7 +139,11 @@ open class MmkvDelegate(
         onKeyChangedListeners.forEach { it(key) }
     }
 
-    /** 清空当前 MMKV 实例中的所有键值对 */
+    /**
+     * 清空当前 MMKV 实例中的所有键值对。
+     *
+     * 此操作会立即生效，所有存储的数据将被删除且无法恢复。
+     */
     fun clear() {
         mmkv.clearAll()
     }
@@ -156,21 +160,41 @@ open class MmkvDelegate(
         keys.forEach { notifyKeyChanged(it) }
     }
 
-    /** 检查指定 [key] 是否存在，支持 `key in store` 语法 */
+    /**
+     * 检查指定 [key] 是否存在，支持 `key in store` 操作符语法。
+     *
+     * @return `true` 如果 key 存在，否则返回 `false`
+     */
     operator fun contains(key: String): Boolean = mmkv.containsKey(key)
 
-    /** 获取所有键名，如果为空返回空数组 */
+    /**
+     * 获取当前存储实例中的所有键名。
+     *
+     * @return 键名数组，如果存储为空则返回空数组
+     */
     fun allKeys(): Array<String> = mmkv.allKeys() ?: emptyArray()
 
-    /** 获取当前存储文件的总大小（字节） */
+    /**
+     * 获取当前存储实例对应的文件总大小。
+     *
+     * @return 文件大小，单位为字节
+     */
     fun totalSize(): Long = mmkv.totalSize()
 
-    /** 同步写入，等待数据写入磁盘完成后再返回 */
+    /**
+     * 同步写入，等待数据完全写入磁盘后再返回。
+     *
+     * 适用于关键数据（如用户凭证、支付信息等），确保数据不会因应用崩溃而丢失。
+     */
     fun sync() {
         mmkv.sync()
     }
 
-    /** 异步写入，立即返回，数据在后台写入磁盘 */
+    /**
+     * 异步写入，立即返回，数据在后台线程写入磁盘。
+     *
+     * 适用于非关键数据（如 UI 状态、临时配置等），写入性能更好，但极端情况下可能丢失数据。
+     */
     fun async() {
         mmkv.async()
     }
@@ -189,13 +213,6 @@ open class MmkvDelegate(
      */
     fun edit(block: MMKV.() -> Unit) {
         val changedKeys = mutableSetOf<String>()
-        val originalGetBoolean = mmkv::decodeBool
-        val originalGetInt = mmkv::decodeInt
-        val originalGetLong = mmkv::decodeLong
-        val originalGetFloat = mmkv::decodeFloat
-        val originalGetString = mmkv::decodeString
-        val originalGetBytes = mmkv::decodeBytes
-        val originalGetStringSet = mmkv::decodeStringSet
 
         val trackingMmkv = object : MMKV by mmkv {
             override fun encode(key: String, value: Boolean) { mmkv.encode(key, value); changedKeys.add(key) }
@@ -467,8 +484,27 @@ open class MmkvDelegate(
         notifyKeyChanged(key)
     }
 
+    /**
+     * 读取 JSON 对象。
+     *
+     * 使用前必须先通过 [AwStoreJsonAdapter.setAdapter] 注册 JSON 适配器。
+     *
+     * @param key MMKV 键名
+     * @return 反序列化后的对象，若 key 不存在或解析失败则返回 `null`
+     * @throws IllegalStateException 未设置 JSON 适配器时抛出
+     */
     inline fun <reified T : Any> getJson(key: String): T? = getJsonInternal(key, T::class)
 
+    /**
+     * 写入 JSON 对象。
+     *
+     * 使用前必须先通过 [AwStoreJsonAdapter.setAdapter] 注册 JSON 适配器。
+     * 对象将被序列化为 JSON 字符串存储。
+     *
+     * @param key MMKV 键名
+     * @param value 要存储的对象
+     * @throws IllegalStateException 未设置 JSON 适配器时抛出
+     */
     inline fun <reified T : Any> putJson(key: String, value: T) = putJsonInternal(key, value, T::class)
 
     private val contentChangeListeners = ConcurrentHashMap<String, CopyOnWriteArrayList<(String) -> Unit>>()

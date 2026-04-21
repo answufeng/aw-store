@@ -33,11 +33,8 @@ object AwStore {
         if (initialized) return
         synchronized(this) {
             if (initialized) return
-            if (rootDir != null) {
-                MMKV.initialize(context.applicationContext, rootDir)
-            } else {
-                MMKV.initialize(context.applicationContext)
-            }
+            val appContext = context.applicationContext
+            rootDir?.let { MMKV.initialize(appContext, it) } ?: MMKV.initialize(appContext)
             AwStoreLogger.enabled = logEnabled
             initialized = true
             AwStoreLogger.d("AwStore.init: complete, rootDir=${MMKV.getRootDir()}")
@@ -53,7 +50,12 @@ object AwStore {
         }
     }
 
-    /** 是否已初始化 */
+    /**
+     * 是否已初始化。
+     *
+     * 可用于检查 MMKV 是否已完成初始化，避免重复调用 [init]。
+     * 在访问任何存储属性前应确保此值为 `true`。
+     */
     val isInitialized: Boolean get() = initialized
 
     /** MMKV 根目录路径，访问前需确保已初始化 */
