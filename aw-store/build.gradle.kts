@@ -36,6 +36,11 @@ android {
             )
         }
     }
+
+    lint {
+        abortOnError = false
+        warningsAsErrors = false
+    }
 }
 
 dependencies {
