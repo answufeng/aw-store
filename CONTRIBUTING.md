@@ -37,3 +37,7 @@
 ./gradlew :aw-store:lintRelease
 ./gradlew :demo:assembleRelease            # 构建 Demo
 ```
+
+## 发版前补充检查（R8）
+
+MMKV native 与 Parcelable/JSON 反射边界需 release 冒烟；升级 MMKV 主版本时同步 README 与 demo 多进程用例。

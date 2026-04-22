@@ -6,12 +6,26 @@
 
 **验证环境**：仓库 **demo** 使用 compileSdk 35 / targetSdk 35（JDK 17）。
 
+## 文档导读
+
+1. [工程品质与发版检查](#工程品质与发版检查) → [快速开始](#快速开始) → [Nullable / 加密 / 多进程](#nullable-类型)  
+2. [演示应用](#演示应用)：[demo/DEMO_MATRIX.md](demo/DEMO_MATRIX.md)（含 **推荐手测**）  
+3. **密钥**：见下文 [密钥与加密（误用防火墙）](#密钥与加密误用防火墙)
+
 ## 工程品质与发版检查
 
 - **CI**：[`.github/workflows/ci.yml`](.github/workflows/ci.yml) — `assembleRelease`、`ktlintCheck`、`lintRelease`、`:demo:assembleRelease`。
 - **本地建议**：`./gradlew :aw-store:assembleRelease :aw-store:ktlintCheck :aw-store:lintRelease :demo:assembleRelease`
 - **演示**：[demo/DEMO_MATRIX.md](demo/DEMO_MATRIX.md)；demo 菜单 **「演示清单」**。
 - **上线前**：确认 **MMKV 根目录**与备份策略；加密场景校验 **CryptKey** 不落日志；多进程与 `mmapId` 隔离在目标机型验证。
+
+### 密钥与加密（误用防火墙）
+
+| 误用 | 后果 | 正确做法 |
+|------|------|----------|
+| 把 **明文密码** 当 `cryptKey` 写进仓库或 Log | 密钥泄露即数据全泄露 | 使用 `CryptKey.fromSecureRandom()` 或服务端下发 + 安全存储；禁止打日志 |
+| 多版本 **随意更换密钥** 不迁移数据 | 旧数据无法解密 | 设计密钥版本与迁移策略（或新 mmapId 冷启动） |
+| **多进程** 与错误 `mmapId` 混用 | 读写不一致或损坏风险 | 严格按 MMKV 文档配置 `multiProcess` 与文件路径 |
 
 ## 特性
 
