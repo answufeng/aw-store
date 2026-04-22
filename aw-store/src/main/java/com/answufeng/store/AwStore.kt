@@ -1,7 +1,10 @@
 package com.answufeng.store
 
 import android.content.Context
+import android.content.pm.ApplicationInfo
+import android.util.Log
 import com.tencent.mmkv.MMKV
+import java.io.File
 
 /**
  * MMKV 存储库的全局入口。
@@ -25,19 +28,44 @@ object AwStore {
     /**
      * 初始化 MMKV。整个应用生命周期只需调用一次。
      *
+     * 若重复调用且传入与首次不一致的 [rootDir]，将始终 **Log.w** 告警；在 **debuggable**
+     * 包上会额外抛出 [IllegalStateException]，避免静默误用。重复调用时仍会应用最新的 [logEnabled]。
+     *
      * @param context 任意 Context（内部自动取 applicationContext）
      * @param rootDir 自定义存储根目录，为 null 时使用默认目录（`files/mmkv`）
      * @param logEnabled 是否启用调试日志，默认 false
      */
     fun init(context: Context, rootDir: String? = null, logEnabled: Boolean = false) {
-        if (initialized) return
+        val appContext = context.applicationContext
         synchronized(this) {
-            if (initialized) return
-            val appContext = context.applicationContext
+            if (initialized) {
+                if (rootDir != null && !sameRootDirectory(MMKV.getRootDir(), rootDir)) {
+                    val msg =
+                        "AwStore: MMKV already initialized at '${MMKV.getRootDir()}', " +
+                            "cannot switch to rootDir='$rootDir'. Use a single init with the intended path."
+                    Log.w("AwStore", msg)
+                    if (isDebuggable(appContext)) {
+                        error(msg)
+                    }
+                }
+                AwStoreLogger.enabled = logEnabled
+                return
+            }
             rootDir?.let { MMKV.initialize(appContext, it) } ?: MMKV.initialize(appContext)
             AwStoreLogger.enabled = logEnabled
             initialized = true
             AwStoreLogger.d("AwStore.init: complete, rootDir=${MMKV.getRootDir()}")
+        }
+    }
+
+    private fun isDebuggable(context: Context): Boolean =
+        (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+
+    private fun sameRootDirectory(current: String, requested: String): Boolean {
+        return try {
+            File(current).canonicalPath == File(requested).canonicalPath
+        } catch (_: Exception) {
+            current.trimEnd('/', '\\') == requested.trimEnd('/', '\\')
         }
     }
 

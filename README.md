@@ -120,6 +120,8 @@ class App : Application() {
 }
 ```
 
+**重复调用**：`rootDir` 在进程内只能生效一次。若 MMKV 已初始化后又传入**不同的** `rootDir`，Release 会 **Log.w**；**debuggable** 包会抛出 **IllegalStateException**。无论是否重复调用，最后一次的 **logEnabled** 都会应用到 `AwStoreLogger`。
+
 ### 自定义存储目录
 
 ```kotlin
