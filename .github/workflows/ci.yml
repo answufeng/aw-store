@@ -62,4 +62,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: lint-results
-          path: aw-store/build/reports/lint-results-debug.html
+          path: aw-store/build/reports/lint-results*.html

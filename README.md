@@ -15,7 +15,7 @@
 ## 工程品质与发版检查
 
 - **CI**：[`.github/workflows/ci.yml`](.github/workflows/ci.yml) — `assembleRelease`、`ktlintCheck`、`lintRelease`、`:demo:assembleRelease`。
-- **本地建议**：`./gradlew :aw-store:assembleRelease :aw-store:ktlintCheck :aw-store:lintRelease :demo:assembleRelease`
+- **本地建议**：`./gradlew :aw-store:assembleRelease :aw-store:ktlintCheck :aw-store:lintRelease :demo:assembleRelease`（**需 JDK 17+**，与 CI 一致。）
 - **演示**：[demo/DEMO_MATRIX.md](demo/DEMO_MATRIX.md)；demo 菜单 **「演示清单」**。
 - **上线前**：确认 **MMKV 根目录**与备份策略；加密场景校验 **CryptKey** 不落日志；多进程与 `mmapId` 隔离在目标机型验证。
 
@@ -538,6 +538,7 @@ AwStoreLogger.setLogger { level, tag, msg, t ->
 | 自定义日志 | `AwStoreLogger.setLogger { ... }` | 自定义日志输出 |
 | 存储根目录 | `AwStore.rootDir` | 获取当前 MMKV 根目录路径 |
 | JSON 适配器 | `AwStoreJsonAdapter.setAdapter(adapter)` | 使用 json() 委托前必须设置 |
+| 清除 JSON 适配器 | `AwStoreJsonAdapter.clearAdapter()` | 调试或集成验证时移除注册，之后需再 `setAdapter` |
 
 ## 依赖说明
 
@@ -604,4 +605,5 @@ UserStore.importFromMap(backup)
 ## 许可证
 
 Apache License 2.0，详见 [LICENSE](LICENSE)。
-# Last updated: 2026年 4月 21日
+
+*文档修订：2026-04-22。*

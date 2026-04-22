@@ -51,6 +51,15 @@ object AwStoreJsonAdapter : StoreJsonAdapter {
         impl = adapter
     }
 
+    /**
+     * 移除已注册的适配器，后续 [toJson] / [fromJson] 会按未设置处理。
+     *
+     * 供进程内重置或调试使用；一般业务不需要调用。
+     */
+    fun clearAdapter() {
+        impl = null
+    }
+
     override fun <T : Any> toJson(value: T, clazz: KClass<T>): String {
         return impl?.toJson(value, clazz)
             ?: throw IllegalStateException(

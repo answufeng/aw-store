@@ -18,6 +18,7 @@
 
 ## 代码规范
 
+- 仓库根目录 [`.editorconfig`](.editorconfig) 约定换行/缩进；提交前建议运行 `ktlintCheck`
 - 遵循 [Kotlin 编码规范](https://kotlinlang.org/docs/coding-conventions.html)
 - 公共 API 必须有 KDoc 注释
 - 新功能请在 `demo` 中提供可运行入口，或在 PR 中写明手测步骤

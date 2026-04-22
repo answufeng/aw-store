@@ -28,7 +28,9 @@ object SpMigration {
      * @param cryptKey 目标 MMKV 的加密密钥字符串，为 null 时不加密
      * @param secureCryptKey 目标 MMKV 的安全加密密钥，优先级高于 [cryptKey]
      * @param multiProcess 是否使用多进程模式，默认 false
-     * @param deleteAfterMigration 迁移成功后是否清除原 SP 数据，默认 true
+     * @param deleteAfterMigration 当 [MigrationResult.failedCount] 为 0 时是否在返回前同步清空原 SP
+     *                            （[android.content.SharedPreferences.Editor.commit]）；
+     *                            若存在失败项则**不会**清除，避免数据丢失，可修复后重试迁移。
      * @return [MigrationResult] 迁移结果
      */
     fun migrate(
@@ -101,7 +103,11 @@ object SpMigration {
         }
     }
 
-    private fun stableIdForCryptKey(cryptKey: String): String {
+    /**
+     * SHA-256 前 8 字节的十六进制，用作仅 [cryptKey] 时的 [mmapId] 后缀，避免用 [String.hashCode] 碰撞。
+     * 为 [internal] 供同模块内部复用；行为变更视为兼容敏感变更。
+     */
+    internal fun stableIdForCryptKey(cryptKey: String): String {
         val digest = MessageDigest.getInstance("SHA-256")
             .digest(cryptKey.toByteArray())
         return digest.take(8).joinToString("") { "%02x".format(it) }
