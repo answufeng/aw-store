@@ -2,10 +2,15 @@ package com.answufeng.store.demo
 
 import android.os.Bundle
 import android.os.Parcelable
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
 import android.widget.Button
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import com.google.android.material.appbar.MaterialToolbar
 import com.answufeng.store.AwStore
 import com.answufeng.store.AwStoreLogger
 import com.answufeng.store.CryptKey
@@ -76,10 +81,14 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var tvLog: TextView
     private lateinit var logScrollView: ScrollView
+    private lateinit var toolbar: MaterialToolbar
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        toolbar = findViewById(R.id.toolbar)
+        setSupportActionBar(toolbar)
 
         tvLog = findViewById(R.id.tvLog)
         logScrollView = findViewById(R.id.logScrollView)
@@ -118,8 +127,8 @@ class MainActivity : AppCompatActivity() {
 
         AwStoreJsonAdapter.setAdapter(GsonAdapter())
 
-        log("✅ 存储初始化完成")
-        log("📊 点击按钮测试各项功能")
+        log("[OK] AwStore initialized")
+        log("[TIP] Tap buttons to run demos")
     }
 
     private fun log(msg: String) {
@@ -129,7 +138,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun clearLog() {
-        tvLog.text = "日志已清除\n"
+        tvLog.text = "Log cleared.\n"
     }
 
     private fun writeValues() {
@@ -141,11 +150,11 @@ class MainActivity : AppCompatActivity() {
         UserStore.nickname = "Alice"
         UserStore.age = 25
         UserStore.ratio = 3.14159
-        log("✅ 基本值写入成功(含Double)")
+        log("[OK] Wrote basic values (incl. Double)")
     }
 
     private fun readValues() {
-        log("📖 读取基本值:")
+        log("[READ] Basic values")
         log("  token: ${UserStore.token}")
         log("  userId: ${UserStore.userId}")
         log("  isLoggedIn: ${UserStore.isLoggedIn}")
@@ -158,12 +167,12 @@ class MainActivity : AppCompatActivity() {
 
     private fun setNullableStringNull() {
         UserStore.nickname = null
-        log("🔄 可空字符串设置为null: ${UserStore.nickname}")
+        log("[NULL] nickname = ${UserStore.nickname}")
     }
 
     private fun setNullableIntNull() {
         UserStore.age = null
-        log("🔄 可空整型设置为null: ${UserStore.age}")
+        log("[NULL] age = ${UserStore.age}")
     }
 
     private fun testNullableOthers() {
@@ -171,7 +180,7 @@ class MainActivity : AppCompatActivity() {
         UserStore.nullableScore = 88.5f
         UserStore.nullableRatio = 2.71828
         UserStore.nullableEnabled = true
-        log("📖 Nullable Long/Float/Double/Boolean:")
+        log("[READ] Nullable Long/Float/Double/Boolean")
         log("  nullableTimestamp: ${UserStore.nullableTimestamp}")
         log("  nullableScore: ${UserStore.nullableScore}")
         log("  nullableRatio: ${UserStore.nullableRatio}")
@@ -180,7 +189,7 @@ class MainActivity : AppCompatActivity() {
         UserStore.nullableScore = null
         UserStore.nullableRatio = null
         UserStore.nullableEnabled = null
-        log("📖 设null后:")
+        log("[READ] After set null")
         log("  nullableTimestamp: ${UserStore.nullableTimestamp}")
         log("  nullableScore: ${UserStore.nullableScore}")
         log("  nullableRatio: ${UserStore.nullableRatio}")
@@ -190,57 +199,57 @@ class MainActivity : AppCompatActivity() {
     private fun testParcelable() {
         ParcelableStore.profile = UserProfile("Alice", 25)
         val profile = ParcelableStore.profile
-        log("📦 Parcelable存储: $profile")
+        log("[Parcelable] $profile")
 
         val retrieved = ParcelableStore.getParcelable<UserProfile>("profile")
-        log("📦 命令式API getParcelable: $retrieved")
+        log("[Parcelable] imperative getParcelable: $retrieved")
         ParcelableStore.clear()
     }
 
     private fun testBytes() {
         BytesStore.binaryData = byteArrayOf(0x01, 0x02, 0x03, 0x04)
         BytesStore.nullableBinaryData = byteArrayOf(0xFF.toByte(), 0xFE.toByte())
-        log("📦 ByteArray存储: ${BytesStore.binaryData.toList()}")
-        log("📦 Nullable ByteArray: ${BytesStore.nullableBinaryData?.toList()}")
+        log("[Bytes] ${BytesStore.binaryData.toList()}")
+        log("[Bytes] nullable: ${BytesStore.nullableBinaryData?.toList()}")
         BytesStore.nullableBinaryData = null
-        log("📦 Nullable ByteArray设null后: ${BytesStore.nullableBinaryData}")
+        log("[Bytes] nullable after null: ${BytesStore.nullableBinaryData}")
         BytesStore.clear()
     }
 
     private fun testNullableStringSet() {
         NullableSetStore.tags = setOf("kotlin", "mmkv")
-        log("📦 Nullable StringSet: ${NullableSetStore.tags}")
+        log("[StringSet] nullable: ${NullableSetStore.tags}")
         NullableSetStore.tags = null
-        log("📦 Nullable StringSet设null后: ${NullableSetStore.tags}")
+        log("[StringSet] nullable after null: ${NullableSetStore.tags}")
         NullableSetStore.clear()
     }
 
     private fun testJson() {
         JsonStore.user = UserInfo("Bob", "bob@example.com", 5)
         val user = JsonStore.user
-        log("📋 JSON存储: $user")
+        log("[JSON] $user")
 
         JsonStore.putJson("json_imperative", UserInfo("Eve", "eve@test.com", 3))
         val imperative = JsonStore.getJson<UserInfo>("json_imperative")
-        log("📋 命令式API putJson/getJson: $imperative")
+        log("[JSON] imperative putJson/getJson: $imperative")
         JsonStore.clear()
     }
 
     private fun testEncryptedStore() {
         SecureStore.password = "secret123"
-        log("🔒 加密存储密码: ${SecureStore.password}")
+        log("[Secure] password: ${SecureStore.password}")
     }
 
     private fun testIsolation() {
         IsolatedStore.data = "isolated_data"
-        log("🔄 多实例隔离:")
+        log("[Isolation] multiple instances")
         log("  IsolatedStore.data: ${IsolatedStore.data}")
         log("  UserStore.token (未改变): ${UserStore.token}")
     }
 
     private fun testMultiProcess() {
         MultiProcessStore.counter++
-        log("🔄 多进程计数器: ${MultiProcessStore.counter}")
+        log("[MultiProcess] counter: ${MultiProcessStore.counter}")
     }
 
     private fun testSpMigration() {
@@ -251,46 +260,46 @@ class MainActivity : AppCompatActivity() {
             .putBoolean("migrated_bool", true)
             .apply()
         val result = SpMigration.migrate(this, "old_prefs")
-        log("🔄 SP迁移结果: $result")
+        log("[Migration] SP → MMKV: $result")
     }
 
     private fun testContentChangeListener() {
         UserStore.registerContentChange { mmapID ->
-            runOnUiThread { log("🔄 其他进程修改了内容: $mmapID") }
+            runOnUiThread { log("[IPC] content changed: $mmapID") }
         }
-        log("🔄 跨进程监听器已注册，尝试从其他进程写入值")
+        log("[IPC] listener registered. Try writing from another process.")
     }
 
     private fun testOnKeyChanged() {
         UserStore.onKeyChanged { key ->
-            runOnUiThread { log("🔑 单进程键变更: $key") }
+            runOnUiThread { log("[KeyChanged] $key") }
         }
         UserStore.putString("test_key", "test_value")
         UserStore.putInt("test_int", 42)
         UserStore.remove("test_key")
-        log("🔑 单进程监听器已注册并测试完成")
+        log("[KeyChanged] listener registered and tested")
     }
 
     private fun testSync() {
         UserStore.token = "sync_value"
         UserStore.sync()
-        log("⏳ 同步写入完成(sync)")
+        log("[Sync] committed")
     }
 
     private fun testAsync() {
         UserStore.token = "async_value"
         UserStore.async()
-        log("⚡ 异步写入已提交(async)")
+        log("[Async] scheduled")
     }
 
     private fun testImperativeApi() {
         UserStore.putString("imperative_key", "hello_from_api")
         val value = UserStore.getString("imperative_key")
-        log("📝 命令式API: putString/getString → $value")
+        log("[API] putString/getString → $value")
         UserStore.putInt("imperative_int", 100)
-        log("📝 命令式API: putInt/getInt → ${UserStore.getInt("imperative_int")}")
+        log("[API] putInt/getInt → ${UserStore.getInt("imperative_int")}")
         UserStore.remove("imperative_key", "imperative_int")
-        log("📝 命令式API: remove后 getString → ${UserStore.getString("imperative_key")}")
+        log("[API] after remove getString → ${UserStore.getString("imperative_key")}")
     }
 
     private fun testBatchWrite() {
@@ -299,44 +308,44 @@ class MainActivity : AppCompatActivity() {
             encode("batch_int", 999)
             encode("batch_bool", true)
         }
-        log("📝 批量写入: str=${UserStore.getString("batch_str")}, int=${UserStore.getInt("batch_int")}, bool=${UserStore.getBoolean("batch_bool")}")
+        log("[Batch] str=${UserStore.getString("batch_str")}, int=${UserStore.getInt("batch_int")}, bool=${UserStore.getBoolean("batch_bool")}")
         UserStore.remove("batch_str", "batch_int", "batch_bool")
     }
 
     private fun testGetOrPut() {
         UserStore.remove("getorput_key")
         val v1 = UserStore.getOrPutString("getorput_key") { "first_default" }
-        log("📝 getOrPutString(不存在): $v1")
+        log("[GetOrPut] getOrPutString(missing): $v1")
         val v2 = UserStore.getOrPutString("getorput_key") { "second_default" }
-        log("📝 getOrPutString(已存在): $v2")
+        log("[GetOrPut] getOrPutString(existing): $v2")
         UserStore.remove("getorput_key")
 
         val count = UserStore.getOrPutInt("launch_count") { 0 }
-        log("📝 getOrPutInt: launch_count=$count")
+        log("[GetOrPut] launch_count=$count")
     }
 
     private fun testExportImport() {
         UserStore.putString("export_key", "export_value")
         UserStore.putInt("export_int", 42)
         val data = UserStore.exportToMap()
-        log("📤 导出数据: $data")
+        log("[Export] $data")
 
         UserStore.clear()
-        log("📤 清空后: ${UserStore.getString("export_key")}")
+        log("[Export] after clear: ${UserStore.getString("export_key")}")
 
         val count = UserStore.importFromMap(data)
-        log("📥 导入$count条数据后: str=${UserStore.getString("export_key")}, int=${UserStore.getInt("export_int")}")
+        log("[Import] imported=$count, str=${UserStore.getString("export_key")}, int=${UserStore.getInt("export_int")}")
         UserStore.remove("export_key", "export_int")
     }
 
     private fun testMmkvInstance() {
         val mmkv = UserStore.mmkvInstance
-        log("🔧 MMKV实例: mmapID=${mmkv.mmapID()}, totalSize=${mmkv.totalSize()}")
+        log("[MMKV] mmapID=${mmkv.mmapID()}, totalSize=${mmkv.totalSize()}")
     }
 
     private fun testManage() {
         UserStore.token = "test"
-        log("🔧 管理功能:")
+        log("[Manage]")
         log("  'token' in UserStore: ${"token" in UserStore}")
         log("  所有键: ${UserStore.allKeys().toList()}")
         UserStore.remove("token")
@@ -345,7 +354,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun testTotalSize() {
-        log("📊 存储文件大小:")
+        log("[Size]")
         log("  UserStore: ${UserStore.totalSize()} bytes")
         log("  SecureStore: ${SecureStore.totalSize()} bytes")
     }
@@ -359,6 +368,48 @@ class MainActivity : AppCompatActivity() {
         BytesStore.clear()
         NullableSetStore.clear()
         JsonStore.clear()
-        log("🗑️ 所有存储已清除")
+        log("[OK] All stores cleared")
+    }
+
+    override fun onCreateOptionsMenu(menu: android.view.Menu): Boolean {
+        menuInflater.inflate(R.menu.main_menu, menu)
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: android.view.MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.action_copy_log -> {
+                copyLogToClipboard()
+                true
+            }
+            R.id.action_share_log -> {
+                shareLog()
+                true
+            }
+            R.id.action_clear_log -> {
+                clearLog()
+                true
+            }
+            R.id.action_clear_all -> {
+                clearAll()
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
+    }
+
+    private fun copyLogToClipboard() {
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(ClipData.newPlainText("AwStore Demo Log", tvLog.text))
+        log("[OK] Log copied to clipboard")
+    }
+
+    private fun shareLog() {
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_SUBJECT, "AwStore Demo Log")
+            putExtra(Intent.EXTRA_TEXT, tvLog.text.toString())
+        }
+        startActivity(Intent.createChooser(intent, "Share log"))
     }
 }

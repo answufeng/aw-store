@@ -3,6 +3,8 @@ package com.answufeng.store
 import android.os.Parcelable
 import com.tencent.mmkv.MMKV
 import com.tencent.mmkv.MMKVContentChangeNotification
+import java.math.BigDecimal
+import java.math.BigInteger
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.properties.ReadWriteProperty
@@ -95,8 +97,8 @@ open class MmkvDelegate(
     /**
      * 注册单进程内的键值变更回调。
      *
-     * 当通过属性委托或命令式 API 写入/删除键时触发，适用于同进程内的数据变化监听。
-     * 跨进程数据变化请使用 [registerContentChange]。
+     * 当通过属性委托或命令式 API 写入/删除键时触发，**[clear] 时会对清空前存在的每个 key 各触发一次**（键已删除），
+     * 适用于同进程内的数据变化监听。跨进程数据变化请使用 [registerContentChange]。
      *
      * ```kotlin
      * UserStore.onKeyChanged { key ->
@@ -142,10 +144,13 @@ open class MmkvDelegate(
     /**
      * 清空当前 MMKV 实例中的所有键值对。
      *
-     * 此操作会立即生效，所有存储的数据将被删除且无法恢复。
+     * 此操作会立即生效，所有存储的数据将被删除且无法恢复。清空前会对当时存在的每个 key
+     * 各调用一次 [registerOnKeyChanged] 的回调，便于与 [remove] 等行为一致地刷新 UI。
      */
     fun clear() {
+        val keys = mmkv.allKeys()
         mmkv.clearAll()
+        keys?.forEach { notifyKeyChanged(it) }
     }
 
     /** 删除指定 [key] 对应的键值对 */
@@ -210,23 +215,13 @@ open class MmkvDelegate(
      *     encode("key2", 42)
      * }
      * ```
+     *
+     * 若需使用 [MMKV] 的其它写入（如带过期时间的 [MMKV.encode] 重载），可通过 [MmkvEditScope.mmkv] 调用并在写入后
+     * 调用 [MmkvEditScope.markKeyChanged]，否则键变更监听器收不到这些键的回调。
      */
-    fun edit(block: MMKV.() -> Unit) {
+    fun edit(block: MmkvEditScope.() -> Unit) {
         val changedKeys = mutableSetOf<String>()
-
-        val trackingMmkv = object : MMKV by mmkv {
-            override fun encode(key: String, value: Boolean) { mmkv.encode(key, value); changedKeys.add(key) }
-            override fun encode(key: String, value: Int) { mmkv.encode(key, value); changedKeys.add(key) }
-            override fun encode(key: String, value: Long) { mmkv.encode(key, value); changedKeys.add(key) }
-            override fun encode(key: String, value: Float) { mmkv.encode(key, value); changedKeys.add(key) }
-            override fun encode(key: String, value: String?) { mmkv.encode(key, value); changedKeys.add(key) }
-            override fun encode(key: String, value: ByteArray?) { mmkv.encode(key, value); changedKeys.add(key) }
-            override fun encode(key: String, value: Set<String>?) { mmkv.encode(key, value); changedKeys.add(key) }
-            override fun removeValueForKey(key: String) { mmkv.removeValueForKey(key); changedKeys.add(key) }
-            override fun removeValuesForKeys(keys: Array<out String>) { mmkv.removeValuesForKeys(keys); changedKeys.addAll(keys) }
-            override fun clearAll() { mmkv.clearAll(); mmkv.allKeys()?.let { changedKeys.addAll(it) } }
-        }
-        trackingMmkv.block()
+        MmkvEditScope(mmkv, changedKeys).block()
         changedKeys.forEach { notifyKeyChanged(it) }
     }
 
@@ -422,23 +417,17 @@ open class MmkvDelegate(
      *
      * 支持的类型：String、Int、Long、Float、Double、Boolean、ByteArray、Set\<String\>。
      * 其他类型（如 Parcelable、Serializable、JSON）以原始字节或字符串形式导出。
+     *
+     * **说明**：MMKV 在存储侧按类型做区分，但公开 API 不提供按 key 查询值类型的能力。本方法按固定顺序
+     * 试解码，对绝大多数「每个 key 只使用一种 [encode] 类型」的数据是正确的；`Boolean` 与 `Int`（例如
+     * `0` / `false`）等理论上有歧义，且若某 key 恰好存的是 [Int.MAX_VALUE] 会落入后续 [Long] / 浮点分支；
+     * Parcelable/自定义字节可能被判为 [ByteArray]。请勿用于对类型精度有严格要求的场景。
      */
     fun exportToMap(): Map<String, Any?> {
         val result = mutableMapOf<String, Any?>()
         val keys = mmkv.allKeys() ?: return emptyMap()
         for (key in keys) {
-            val value: Any? = when (mmkv.getValueType(key)) {
-                MMKV.VALUE_TYPE_STRING -> mmkv.decodeString(key, null)
-                MMKV.VALUE_TYPE_INT -> mmkv.decodeInt(key, 0)
-                MMKV.VALUE_TYPE_LONG -> mmkv.decodeLong(key, 0L)
-                MMKV.VALUE_TYPE_FLOAT -> mmkv.decodeFloat(key, 0f)
-                MMKV.VALUE_TYPE_DOUBLE -> mmkv.decodeDouble(key, 0.0)
-                MMKV.VALUE_TYPE_BOOL -> mmkv.decodeBool(key, false)
-                MMKV.VALUE_TYPE_BYTES -> mmkv.decodeBytes(key)
-                MMKV.VALUE_TYPE_STRINGSET -> mmkv.decodeStringSet(key, emptySet())
-                else -> null
-            }
-            result[key] = value
+            result[key] = decodeValueForExport(mmkv, key)
         }
         return result
     }
@@ -446,28 +435,103 @@ open class MmkvDelegate(
     /**
      * 从 Map 导入键值对到当前存储。
      *
-     * 支持的类型：String、Int、Long、Float、Double、Boolean、ByteArray、Set\<String\>。
-     * 已存在的键会被覆盖。
+     * 支持的类型：String、Int、Long、Float、Double、Boolean、ByteArray、Set\<String\>、[Byte]、[Short]、
+     * [java.math.BigDecimal]、[java.math.BigInteger]（后两者常见于 JSON/配置反序列化）；`null` 会删除该 key。已存在的键会被覆盖。
      *
-     * @return 成功导入的键数量
+     * 不支持的 [Map] 项会被跳过，并在 [AwStoreLogger.enabled] 为 `true` 时打 WARN 日志，便于排查问题。
+     *
+     * @return 成功写入或删除（`null` 项）的键数量
      */
     fun importFromMap(map: Map<String, Any?>): Int {
         var count = 0
+        var skipped = 0
         for ((key, value) in map) {
             when (value) {
-                is String -> { mmkv.encode(key, value); count++ }
-                is Int -> { mmkv.encode(key, value); count++ }
-                is Long -> { mmkv.encode(key, value); count++ }
-                is Float -> { mmkv.encode(key, value); count++ }
-                is Double -> { mmkv.encode(key, value); count++ }
-                is Boolean -> { mmkv.encode(key, value); count++ }
-                is ByteArray -> { mmkv.encode(key, value); count++ }
-                is Set<*> -> {
-                    @Suppress("UNCHECKED_CAST")
-                    (value as? Set<String>)?.let { mmkv.encode(key, it); count++ }
+                is String -> {
+                    mmkv.encode(key, value)
+                    notifyKeyChanged(key)
+                    count++
                 }
-                null -> { mmkv.removeValueForKey(key); count++ }
+                is Int -> {
+                    mmkv.encode(key, value)
+                    notifyKeyChanged(key)
+                    count++
+                }
+                is Long -> {
+                    mmkv.encode(key, value)
+                    notifyKeyChanged(key)
+                    count++
+                }
+                is Float -> {
+                    mmkv.encode(key, value)
+                    notifyKeyChanged(key)
+                    count++
+                }
+                is Double -> {
+                    mmkv.encode(key, value)
+                    notifyKeyChanged(key)
+                    count++
+                }
+                is Boolean -> {
+                    mmkv.encode(key, value)
+                    notifyKeyChanged(key)
+                    count++
+                }
+                is ByteArray -> {
+                    mmkv.encode(key, value)
+                    notifyKeyChanged(key)
+                    count++
+                }
+                is Set<*> -> {
+                    if (value.isEmpty()) {
+                        mmkv.encode(key, emptySet())
+                        notifyKeyChanged(key)
+                        count++
+                    } else {
+                        val asStrings = value.mapNotNull { it as? String }
+                        if (asStrings.size == value.size) {
+                            mmkv.encode(key, asStrings.toSet())
+                            notifyKeyChanged(key)
+                            count++
+                        } else {
+                            skipped++
+                            AwStoreLogger.w("importFromMap: skip key=\"$key\", Set must contain only String (got ${value.map { it?.javaClass?.simpleName }})")
+                        }
+                    }
+                }
+                is Byte -> {
+                    mmkv.encode(key, value.toInt())
+                    notifyKeyChanged(key)
+                    count++
+                }
+                is Short -> {
+                    mmkv.encode(key, value.toInt())
+                    notifyKeyChanged(key)
+                    count++
+                }
+                is BigDecimal -> {
+                    mmkv.encode(key, value.toDouble())
+                    notifyKeyChanged(key)
+                    count++
+                }
+                is BigInteger -> {
+                    mmkv.encode(key, value.toLong())
+                    notifyKeyChanged(key)
+                    count++
+                }
+                null -> {
+                    mmkv.removeValueForKey(key)
+                    notifyKeyChanged(key)
+                    count++
+                }
+                else -> {
+                    skipped++
+                    AwStoreLogger.w("importFromMap: skip key=\"$key\", unsupported value type: ${value.javaClass.name}")
+                }
             }
+        }
+        if (skipped > 0) {
+            AwStoreLogger.w("importFromMap: skipped $skipped of ${map.size} entries (see per-key messages above)")
         }
         return count
     }
@@ -1058,4 +1122,107 @@ open class MmkvDelegate(
             notifyKeyChanged(k)
         }
     }
+}
+
+/**
+ * [MmkvDelegate.edit] 的接收者：封装常用 [MMKV.encode] 与删除操作，并跟踪变更的 key 以触发单进程回调。
+ * 对「带过期时间」等重载，请通过 [mmkv] 执行并在写入后 [markKeyChanged]。
+ */
+class MmkvEditScope @PublishedApi internal constructor(
+    @PublishedApi internal val mmkv: MMKV,
+    private val changedKeys: MutableSet<String>
+) {
+
+    fun markKeyChanged(key: String) {
+        changedKeys.add(key)
+    }
+
+    fun encode(key: String, value: Boolean): Boolean {
+        val r = mmkv.encode(key, value)
+        changedKeys.add(key)
+        return r
+    }
+
+    fun encode(key: String, value: Int): Boolean {
+        val r = mmkv.encode(key, value)
+        changedKeys.add(key)
+        return r
+    }
+
+    fun encode(key: String, value: Long): Boolean {
+        val r = mmkv.encode(key, value)
+        changedKeys.add(key)
+        return r
+    }
+
+    fun encode(key: String, value: Float): Boolean {
+        val r = mmkv.encode(key, value)
+        changedKeys.add(key)
+        return r
+    }
+
+    fun encode(key: String, value: Double): Boolean {
+        val r = mmkv.encode(key, value)
+        changedKeys.add(key)
+        return r
+    }
+
+    fun encode(key: String, value: String?): Boolean {
+        val r = mmkv.encode(key, value)
+        changedKeys.add(key)
+        return r
+    }
+
+    fun encode(key: String, value: ByteArray?): Boolean {
+        val r = mmkv.encode(key, value)
+        changedKeys.add(key)
+        return r
+    }
+
+    fun encode(key: String, value: Set<String>?): Boolean {
+        val r = mmkv.encode(key, value)
+        changedKeys.add(key)
+        return r
+    }
+
+    fun encode(key: String, value: Parcelable?): Boolean {
+        val r = mmkv.encode(key, value)
+        changedKeys.add(key)
+        return r
+    }
+
+    fun removeValueForKey(key: String) {
+        mmkv.removeValueForKey(key)
+        changedKeys.add(key)
+    }
+
+    fun removeValuesForKeys(keys: Array<out String>) {
+        mmkv.removeValuesForKeys(keys)
+        changedKeys.addAll(keys)
+    }
+
+    fun clearAll() {
+        val snapshot = mmkv.allKeys()
+        mmkv.clearAll()
+        if (snapshot != null) {
+            changedKeys.addAll(listOf(*snapshot))
+        }
+    }
+}
+
+/**
+ * 尽力按「每个 key 一种 MMKV 类型」还原值；与 [MmkvDelegate.exportToMap] 的说明一致。
+ * 顺序：StringSet → String → ByteArray → Int / Long / Float / Double（以哨兵排除「不存在的默认值」；存储 [Int] 的 [Int.MAX_VALUE] 会落入后续分支）。
+ * 与 `0` 与 `false`、`1` 与 `true` 等歧义在 MMKV 中无法无 API 地消除，导出的数可能为 [Int] 或 [Double] 等，仅适合调试与迁移，勿依赖精确类型。
+ */
+private fun decodeValueForExport(m: MMKV, key: String): Any? {
+    if (!m.containsKey(key)) return null
+    m.decodeStringSet(key, null as Set<String>?)?.let { return it }
+    m.decodeString(key, null)?.let { return it }
+    m.decodeBytes(key)?.let { return it }
+    m.decodeInt(key, Int.MAX_VALUE).takeIf { it != Int.MAX_VALUE }?.let { return it }
+    m.decodeLong(key, Long.MAX_VALUE).takeIf { it != Long.MAX_VALUE }?.let { return it }
+    m.decodeFloat(key, Float.NaN).takeIf { !it.isNaN() }?.let { return it }
+    m.decodeDouble(key, Double.NaN).takeIf { !it.isNaN() }?.let { return it }
+    return null
 }

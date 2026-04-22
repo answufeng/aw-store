@@ -22,6 +22,9 @@
     public static java.lang.String getRootDir();
 }
 
+# 批量编辑 API（与 edit {} 同文件对外可见）
+-keep class com.answufeng.store.MmkvEditScope { *; }
+
 # MmkvDelegate 核心存储类
 -keep class com.answufeng.store.MmkvDelegate {
     public <init>(...);

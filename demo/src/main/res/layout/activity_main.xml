@@ -8,15 +8,16 @@
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@color/primary">
+        android:background="@color/background"
+        app:elevation="0dp">
 
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
             android:theme="@style/Toolbar.AwStore"
-            app:title="存储库演示"
-            app:titleTextColor="@color/on_primary" />
+            app:title="AwStore Demo"
+            app:titleTextColor="@color/on_background" />
 
     </com.google.android.material.appbar.AppBarLayout>
 
@@ -24,7 +25,6 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_margin="16dp"
-        android:layout_marginTop="?attr/actionBarSize"
         app:layout_behavior="@string/appbar_scrolling_view_behavior"
         style="@style/Card.AwStore">
 
@@ -351,7 +351,7 @@
                         <TextView
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:text="命令式 API & 便捷方法"
+                            android:text="命令式 API 便捷方法"
                             style="@style/Text.AwStore.Subtitle"
                             android:layout_marginBottom="12dp" />
 
