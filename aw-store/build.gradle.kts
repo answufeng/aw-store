@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.ktlint)
 }
 
 android {
@@ -21,12 +22,6 @@ android {
         jvmTarget = "17"
     }
 
-    testOptions {
-        unitTests {
-            isIncludeAndroidResources = true
-        }
-    }
-
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -38,22 +33,20 @@ android {
     }
 
     lint {
-        abortOnError = false
+        abortOnError = true
         warningsAsErrors = false
     }
+}
+
+ktlint {
+    android.set(true)
+    ignoreFailures = false
 }
 
 dependencies {
     api(libs.mmkv)
     implementation(libs.core.ktx)
     implementation(libs.annotation)
-
-    testImplementation(libs.junit)
-
-    androidTestImplementation(libs.junit)
-    androidTestImplementation(libs.androidx.test.core)
-    androidTestImplementation(libs.androidx.test.runner)
-    androidTestImplementation(libs.androidx.test.ext.junit)
 }
 
 apply(from = "${rootDir}/gradle/publish.gradle.kts")

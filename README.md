@@ -4,6 +4,15 @@
 
 基于腾讯 MMKV 封装的 Android 键值存储库，提供 Kotlin 属性委托语法实现类型安全的存储，支持加密、多实例隔离、多进程和 SharedPreferences 一键迁移。
 
+**验证环境**：仓库 **demo** 使用 compileSdk 35 / targetSdk 35（JDK 17）。
+
+## 工程品质与发版检查
+
+- **CI**：[`.github/workflows/ci.yml`](.github/workflows/ci.yml) — `assembleRelease`、`ktlintCheck`、`lintRelease`、`:demo:assembleRelease`。
+- **本地建议**：`./gradlew :aw-store:assembleRelease :aw-store:ktlintCheck :aw-store:lintRelease :demo:assembleRelease`
+- **演示**：[demo/DEMO_MATRIX.md](demo/DEMO_MATRIX.md)；demo 菜单 **「演示清单」**。
+- **上线前**：确认 **MMKV 根目录**与备份策略；加密场景校验 **CryptKey** 不落日志；多进程与 `mmapId` 隔离在目标机型验证。
+
 ## 特性
 
 - **属性委托语法**：`by string()` / `by int()` / `by boolean()` … 声明即存储
@@ -131,6 +140,10 @@ val nick = UserStore.nickname   // null
 UserStore.age = null            // 删除键
 val age = UserStore.age         // null（区分"不存在"和"值为0"）
 ```
+
+## 演示应用
+
+`demo` 覆盖委托类型、加密、多 mmap、迁移、监听等；索引见 [demo/DEMO_MATRIX.md](demo/DEMO_MATRIX.md)。
 
 ## Nullable 类型
 

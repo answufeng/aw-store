@@ -11,6 +11,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.appbar.MaterialToolbar
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.answufeng.store.AwStore
 import com.answufeng.store.AwStoreLogger
 import com.answufeng.store.CryptKey
@@ -378,6 +379,14 @@ class MainActivity : AppCompatActivity() {
 
     override fun onOptionsItemSelected(item: android.view.MenuItem): Boolean {
         return when (item.itemId) {
+            R.id.action_demo_playbook -> {
+                MaterialAlertDialogBuilder(this)
+                    .setTitle(R.string.demo_playbook_title)
+                    .setMessage(R.string.demo_playbook_message)
+                    .setPositiveButton(android.R.string.ok, null)
+                    .show()
+                true
+            }
             R.id.action_copy_log -> {
                 copyLogToClipboard()
                 true
