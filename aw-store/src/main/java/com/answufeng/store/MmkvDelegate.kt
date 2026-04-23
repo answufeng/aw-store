@@ -48,7 +48,7 @@ import kotlin.reflect.KProperty
  * }
  * ```
  *
- * > **注意**：未调用 [AwStore.init] 就访问属性会抛出 [IllegalStateException]。
+ * > **注意**：若既未通过 [AwStoreInitializer] 完成自动初始化，也未调用 [AwStore.init]，访问存储会抛出 [IllegalStateException]。
  *
  * @param mmapId MMKV 实例 ID，不同 ID 对应不同的存储文件，默认使用 MMKV 默认实例
  * @param cryptKey 加密密钥字符串，传入后该存储文件将使用 AES-CFB 加密，默认不加密。
@@ -89,10 +89,13 @@ open class MmkvDelegate(
      */
     val mmkvInstance: MMKV get() = mmkv
 
-    @PublishedApi
-    internal val emptyByteArray: ByteArray = byteArrayOf()
-
     private val onKeyChangedListeners = CopyOnWriteArrayList<(String) -> Unit>()
+
+    /**
+     * 保证 [getOrPutString] 等同系列「先查后写」操作在同一代理实例上的原子性，避免并发下多次执行 default 回调。
+     * 粒度：每个 [MmkvDelegate] 实例一把锁；不同 store 互不阻塞。
+     */
+    private val getOrPutLock = Any()
 
     /**
      * 注册单进程内的键值变更回调。
@@ -280,7 +283,7 @@ open class MmkvDelegate(
     }
 
     /** 读取字节数组。 */
-    fun getBytes(key: String, default: ByteArray = emptyByteArray): ByteArray = mmkv.decodeBytes(key, default) ?: default
+    fun getBytes(key: String, default: ByteArray = EMPTY_BYTE_ARRAY): ByteArray = mmkv.decodeBytes(key, default) ?: default
 
     /** 写入字节数组，写入后触发键变更通知。 */
     fun putBytes(key: String, value: ByteArray) {
@@ -345,71 +348,157 @@ open class MmkvDelegate(
     /**
      * 读取字符串值，若 key 不存在则写入 [defaultValue] 并返回。
      *
-     * 写入后会触发键变更通知。
+     * 写入后会触发键变更通知。同一 [MmkvDelegate] 实例上并发调用时，[defaultValue] 至多执行一次（见 [getOrPutLock]）。
      */
     fun getOrPutString(key: String, defaultValue: () -> String): String {
-        if (!mmkv.containsKey(key)) {
-            val value = defaultValue()
-            mmkv.encode(key, value)
-            notifyKeyChanged(key)
-            return value
+        synchronized(getOrPutLock) {
+            if (!mmkv.containsKey(key)) {
+                val value = defaultValue()
+                mmkv.encode(key, value)
+                notifyKeyChanged(key)
+                return value
+            }
+            return mmkv.decodeString(key, "") ?: ""
         }
-        return mmkv.decodeString(key, "") ?: ""
     }
 
-    /** 读取整数值，若 key 不存在则写入 [defaultValue] 并返回。写入后触发键变更通知。 */
+    /**
+     * 读取整数值，若 key 不存在则写入 [defaultValue] 并返回。写入后触发键变更通知。
+     * 同一实例上 [defaultValue] 在并发下至多执行一次。
+     */
     fun getOrPutInt(key: String, defaultValue: () -> Int): Int {
-        if (!mmkv.containsKey(key)) {
-            val value = defaultValue()
-            mmkv.encode(key, value)
-            notifyKeyChanged(key)
-            return value
+        synchronized(getOrPutLock) {
+            if (!mmkv.containsKey(key)) {
+                val value = defaultValue()
+                mmkv.encode(key, value)
+                notifyKeyChanged(key)
+                return value
+            }
+            return mmkv.decodeInt(key, 0)
         }
-        return mmkv.decodeInt(key, 0)
     }
 
-    /** 读取长整数值，若 key 不存在则写入 [defaultValue] 并返回。写入后触发键变更通知。 */
+    /**
+     * 读取长整数值，若 key 不存在则写入 [defaultValue] 并返回。写入后触发键变更通知。
+     * 同一实例上 [defaultValue] 在并发下至多执行一次。
+     */
     fun getOrPutLong(key: String, defaultValue: () -> Long): Long {
-        if (!mmkv.containsKey(key)) {
-            val value = defaultValue()
-            mmkv.encode(key, value)
-            notifyKeyChanged(key)
-            return value
+        synchronized(getOrPutLock) {
+            if (!mmkv.containsKey(key)) {
+                val value = defaultValue()
+                mmkv.encode(key, value)
+                notifyKeyChanged(key)
+                return value
+            }
+            return mmkv.decodeLong(key, 0L)
         }
-        return mmkv.decodeLong(key, 0L)
     }
 
-    /** 读取布尔值，若 key 不存在则写入 [defaultValue] 并返回。写入后触发键变更通知。 */
+    /**
+     * 读取布尔值，若 key 不存在则写入 [defaultValue] 并返回。写入后触发键变更通知。
+     * 同一实例上 [defaultValue] 在并发下至多执行一次。
+     */
     fun getOrPutBoolean(key: String, defaultValue: () -> Boolean): Boolean {
-        if (!mmkv.containsKey(key)) {
-            val value = defaultValue()
-            mmkv.encode(key, value)
-            notifyKeyChanged(key)
-            return value
+        synchronized(getOrPutLock) {
+            if (!mmkv.containsKey(key)) {
+                val value = defaultValue()
+                mmkv.encode(key, value)
+                notifyKeyChanged(key)
+                return value
+            }
+            return mmkv.decodeBool(key, false)
         }
-        return mmkv.decodeBool(key, false)
     }
 
-    /** 读取浮点数值，若 key 不存在则写入 [defaultValue] 并返回。写入后触发键变更通知。 */
+    /**
+     * 读取浮点数值，若 key 不存在则写入 [defaultValue] 并返回。写入后触发键变更通知。
+     * 同一实例上 [defaultValue] 在并发下至多执行一次。
+     */
     fun getOrPutFloat(key: String, defaultValue: () -> Float): Float {
-        if (!mmkv.containsKey(key)) {
-            val value = defaultValue()
-            mmkv.encode(key, value)
-            notifyKeyChanged(key)
-            return value
+        synchronized(getOrPutLock) {
+            if (!mmkv.containsKey(key)) {
+                val value = defaultValue()
+                mmkv.encode(key, value)
+                notifyKeyChanged(key)
+                return value
+            }
+            return mmkv.decodeFloat(key, 0f)
         }
-        return mmkv.decodeFloat(key, 0f)
     }
 
-    /** 读取双精度浮点数值，若 key 不存在则写入 [defaultValue] 并返回。写入后触发键变更通知。 */
+    /**
+     * 读取双精度浮点数值，若 key 不存在则写入 [defaultValue] 并返回。写入后触发键变更通知。
+     * 同一实例上 [defaultValue] 在并发下至多执行一次。
+     */
     fun getOrPutDouble(key: String, defaultValue: () -> Double): Double {
-        if (!mmkv.containsKey(key)) {
+        synchronized(getOrPutLock) {
+            if (!mmkv.containsKey(key)) {
+                val value = defaultValue()
+                mmkv.encode(key, value)
+                notifyKeyChanged(key)
+                return value
+            }
+            return mmkv.decodeDouble(key, 0.0)
+        }
+    }
+
+    /**
+     * 读取字符串集合，若 key 不存在则写入 [defaultValue] 并返回。写入后触发键变更通知。
+     * 同一实例上 [defaultValue] 在并发下至多执行一次。
+     */
+    fun getOrPutStringSet(key: String, defaultValue: () -> Set<String>): Set<String> {
+        synchronized(getOrPutLock) {
+            if (!mmkv.containsKey(key)) {
+                val value = defaultValue()
+                mmkv.encode(key, value)
+                notifyKeyChanged(key)
+                return value
+            }
+            return mmkv.decodeStringSet(key, emptySet()) ?: emptySet()
+        }
+    }
+
+    /**
+     * 读取字节数组，若 key 不存在则写入 [defaultValue] 并返回。写入后触发键变更通知。
+     * 同一实例上 [defaultValue] 在并发下至多执行一次。
+     */
+    fun getOrPutBytes(key: String, defaultValue: () -> ByteArray): ByteArray {
+        synchronized(getOrPutLock) {
+            if (!mmkv.containsKey(key)) {
+                val value = defaultValue()
+                mmkv.encode(key, value)
+                notifyKeyChanged(key)
+                return value
+            }
+            return mmkv.decodeBytes(key, EMPTY_BYTE_ARRAY) ?: EMPTY_BYTE_ARRAY
+        }
+    }
+
+    /**
+     * 读取 JSON 对象；若 key 不存在则序列化 [defaultValue] 的结果并写入后返回。
+     *
+     * 若 key 存在但反序列化失败（损坏或非 JSON），则视为需重建：会用 [defaultValue] 覆盖写入并返回新值。
+     * 使用前须已注册 [AwStoreJsonAdapter]。
+     *
+     * 同一实例上「缺失时的 default」在并发下至多执行一次（与 [getOrPutString] 相同锁）。
+     */
+    inline fun <reified T : Any> getOrPutJson(key: String, noinline defaultValue: () -> T): T =
+        getOrPutJsonImpl(key, T::class, defaultValue)
+
+    @PublishedApi
+    internal fun <T : Any> getOrPutJsonImpl(key: String, clazz: KClass<T>, defaultValue: () -> T): T {
+        synchronized(getOrPutLock) {
+            if (!mmkv.containsKey(key)) {
+                val value = defaultValue()
+                putJsonInternal(key, value, clazz)
+                return value
+            }
+            val existing = getJsonInternal(key, clazz)
+            if (existing != null) return existing
             val value = defaultValue()
-            mmkv.encode(key, value)
-            notifyKeyChanged(key)
+            putJsonInternal(key, value, clazz)
             return value
         }
-        return mmkv.decodeDouble(key, 0.0)
     }
 
     /**
@@ -436,62 +525,71 @@ open class MmkvDelegate(
      * 从 Map 导入键值对到当前存储。
      *
      * 支持的类型：String、Int、Long、Float、Double、Boolean、ByteArray、Set\<String\>、[Byte]、[Short]、
-     * [java.math.BigDecimal]、[java.math.BigInteger]（后两者常见于 JSON/配置反序列化）；`null` 会删除该 key。已存在的键会被覆盖。
+     * [java.math.BigDecimal]、[java.math.BigInteger]（[BigInteger] 须落在 [Long] 精确范围内，否则跳过并记 WARN；[BigDecimal] 以 [Double] 存储可能有精度损失）；`null` 会删除该 key。已存在的键会被覆盖。
      *
      * 不支持的 [Map] 项会被跳过，并在 [AwStoreLogger.enabled] 为 `true` 时打 WARN 日志，便于排查问题。
      *
+     * @param notifyKeyChanges 为 `true`（默认）时每成功写入/删除立即触发 [registerOnKeyChanged]；为 `false` 时在整次导入结束后按 key 去重各触发一次，适合大批量导入以减少 UI 刷新次数。
      * @return 成功写入或删除（`null` 项）的键数量
      */
-    fun importFromMap(map: Map<String, Any?>): Int {
+    fun importFromMap(map: Map<String, Any?>, notifyKeyChanges: Boolean = true): Int {
+        val deferredNotify = if (notifyKeyChanges) null else mutableSetOf<String>()
+        fun onKeyImported(key: String) {
+            if (notifyKeyChanges) {
+                notifyKeyChanged(key)
+            } else {
+                deferredNotify!!.add(key)
+            }
+        }
         var count = 0
         var skipped = 0
         for ((key, value) in map) {
             when (value) {
                 is String -> {
                     mmkv.encode(key, value)
-                    notifyKeyChanged(key)
+                    onKeyImported(key)
                     count++
                 }
                 is Int -> {
                     mmkv.encode(key, value)
-                    notifyKeyChanged(key)
+                    onKeyImported(key)
                     count++
                 }
                 is Long -> {
                     mmkv.encode(key, value)
-                    notifyKeyChanged(key)
+                    onKeyImported(key)
                     count++
                 }
                 is Float -> {
                     mmkv.encode(key, value)
-                    notifyKeyChanged(key)
+                    onKeyImported(key)
                     count++
                 }
                 is Double -> {
                     mmkv.encode(key, value)
-                    notifyKeyChanged(key)
+                    onKeyImported(key)
                     count++
                 }
                 is Boolean -> {
                     mmkv.encode(key, value)
-                    notifyKeyChanged(key)
+                    onKeyImported(key)
                     count++
                 }
                 is ByteArray -> {
                     mmkv.encode(key, value)
-                    notifyKeyChanged(key)
+                    onKeyImported(key)
                     count++
                 }
                 is Set<*> -> {
                     if (value.isEmpty()) {
                         mmkv.encode(key, emptySet())
-                        notifyKeyChanged(key)
+                        onKeyImported(key)
                         count++
                     } else {
                         val asStrings = value.mapNotNull { it as? String }
                         if (asStrings.size == value.size) {
                             mmkv.encode(key, asStrings.toSet())
-                            notifyKeyChanged(key)
+                            onKeyImported(key)
                             count++
                         } else {
                             skipped++
@@ -501,27 +599,35 @@ open class MmkvDelegate(
                 }
                 is Byte -> {
                     mmkv.encode(key, value.toInt())
-                    notifyKeyChanged(key)
+                    onKeyImported(key)
                     count++
                 }
                 is Short -> {
                     mmkv.encode(key, value.toInt())
-                    notifyKeyChanged(key)
+                    onKeyImported(key)
                     count++
                 }
                 is BigDecimal -> {
                     mmkv.encode(key, value.toDouble())
-                    notifyKeyChanged(key)
+                    onKeyImported(key)
                     count++
                 }
                 is BigInteger -> {
-                    mmkv.encode(key, value.toLong())
-                    notifyKeyChanged(key)
-                    count++
+                    try {
+                        val longVal = value.longValueExact()
+                        mmkv.encode(key, longVal)
+                        onKeyImported(key)
+                        count++
+                    } catch (_: ArithmeticException) {
+                        skipped++
+                        AwStoreLogger.w(
+                            "importFromMap: skip key=\"$key\", BigInteger out of Long range: $value"
+                        )
+                    }
                 }
                 null -> {
                     mmkv.removeValueForKey(key)
-                    notifyKeyChanged(key)
+                    onKeyImported(key)
                     count++
                 }
                 else -> {
@@ -529,6 +635,9 @@ open class MmkvDelegate(
                     AwStoreLogger.w("importFromMap: skip key=\"$key\", unsupported value type: ${value.javaClass.name}")
                 }
             }
+        }
+        if (!notifyKeyChanges) {
+            deferredNotify!!.forEach { notifyKeyChanged(it) }
         }
         if (skipped > 0) {
             AwStoreLogger.w("importFromMap: skipped $skipped of ${map.size} entries (see per-key messages above)")
@@ -573,7 +682,19 @@ open class MmkvDelegate(
 
     private val contentChangeListeners = ConcurrentHashMap<String, CopyOnWriteArrayList<(String) -> Unit>>()
 
+    private fun pruneEmptyListenerBuckets(map: ConcurrentHashMap<String, CopyOnWriteArrayList<(String) -> Unit>>) {
+        val iter = map.entries.iterator()
+        while (iter.hasNext()) {
+            val e = iter.next()
+            if (e.value.isEmpty()) iter.remove()
+        }
+    }
+
     companion object {
+        /** 空字节数组单例，供 [getBytes] / [bytes] 默认值等复用，避免每个 [MmkvDelegate] 实例各持一份。 */
+        @PublishedApi
+        internal val EMPTY_BYTE_ARRAY: ByteArray = byteArrayOf()
+
         @Volatile
         private var globalNotificationRegistered = false
         private val globalLock = Any()
@@ -599,6 +720,7 @@ open class MmkvDelegate(
 
         internal fun unregisterGlobalNotification(listener: (String) -> Unit) {
             allListeners.values.forEach { it.remove(listener) }
+            pruneAllListenersEmptyBuckets()
             maybeUnregisterGlobalNotification()
         }
 
@@ -609,7 +731,16 @@ open class MmkvDelegate(
                 }
             }
             listeners.clear()
+            pruneAllListenersEmptyBuckets()
             maybeUnregisterGlobalNotification()
+        }
+
+        private fun pruneAllListenersEmptyBuckets() {
+            val iter = allListeners.entries.iterator()
+            while (iter.hasNext()) {
+                val e = iter.next()
+                if (e.value.isEmpty()) iter.remove()
+            }
         }
 
         private fun maybeUnregisterGlobalNotification() {
@@ -645,6 +776,7 @@ open class MmkvDelegate(
     /** 取消指定的跨进程数据变化监听 */
     fun unregisterContentChange(listener: (String) -> Unit) {
         contentChangeListeners.values.forEach { it.remove(listener) }
+        pruneEmptyListenerBuckets(contentChangeListeners)
         unregisterGlobalNotification(listener)
     }
 
@@ -903,7 +1035,7 @@ open class MmkvDelegate(
      * @param key MMKV 键名，为 null 时自动使用属性名
      * @param default 默认值
      */
-    fun bytes(key: String? = null, default: ByteArray = emptyByteArray) = object : ReadWriteProperty<Any?, ByteArray> {
+    fun bytes(key: String? = null, default: ByteArray = EMPTY_BYTE_ARRAY) = object : ReadWriteProperty<Any?, ByteArray> {
         override fun getValue(thisRef: Any?, property: KProperty<*>): ByteArray {
             val k = key ?: property.name
             return mmkv.decodeBytes(k, default) ?: default
@@ -1129,7 +1261,8 @@ open class MmkvDelegate(
  * 对「带过期时间」等重载，请通过 [mmkv] 执行并在写入后 [markKeyChanged]。
  */
 class MmkvEditScope @PublishedApi internal constructor(
-    @PublishedApi internal val mmkv: MMKV,
+    /** 底层 MMKV，用于 [MMKV.encode] 带过期时间等重载；写入非常规 [encode] 后请 [markKeyChanged]。 */
+    val mmkv: MMKV,
     private val changedKeys: MutableSet<String>
 ) {
 

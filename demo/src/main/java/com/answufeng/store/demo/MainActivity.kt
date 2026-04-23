@@ -62,6 +62,10 @@ object NullableSetStore : MmkvDelegate(mmapId = "nullable_set_demo") {
     var tags by nullableStringSet()
 }
 
+object NullableDefaultStore : MmkvDelegate(mmapId = "nullable_default_demo") {
+    var label by nullableString(default = "（缺省：从未写入）")
+}
+
 object JsonStore : MmkvDelegate(mmapId = "json_demo") {
     var user by json<UserInfo>()
 }
@@ -84,6 +88,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var logScrollView: ScrollView
     private lateinit var toolbar: MaterialToolbar
 
+    private var ipcListener: ((String) -> Unit)? = null
+    private var keyListener: ((String) -> Unit)? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -99,6 +106,7 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnNullableString).setOnClickListener { setNullableStringNull() }
         findViewById<Button>(R.id.btnNullableInt).setOnClickListener { setNullableIntNull() }
         findViewById<Button>(R.id.btnNullableOthers).setOnClickListener { testNullableOthers() }
+        findViewById<Button>(R.id.btnNullableDefault).setOnClickListener { testNullableWithDefault() }
         findViewById<Button>(R.id.btnParcelable).setOnClickListener { testParcelable() }
         findViewById<Button>(R.id.btnBytes).setOnClickListener { testBytes() }
         findViewById<Button>(R.id.btnNullableStringSet).setOnClickListener { testNullableStringSet() }
@@ -107,12 +115,15 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnIsolation).setOnClickListener { testIsolation() }
         findViewById<Button>(R.id.btnMultiProcess).setOnClickListener { testMultiProcess() }
         findViewById<Button>(R.id.btnSpMigration).setOnClickListener { testSpMigration() }
+        findViewById<Button>(R.id.btnSpMigrationKeep).setOnClickListener { testSpMigrationKeepSource() }
         findViewById<Button>(R.id.btnContentChange).setOnClickListener { testContentChangeListener() }
         findViewById<Button>(R.id.btnOnKeyChanged).setOnClickListener { testOnKeyChanged() }
+        findViewById<Button>(R.id.btnUnregisterListeners).setOnClickListener { unregisterDemoListeners() }
         findViewById<Button>(R.id.btnSync).setOnClickListener { testSync() }
         findViewById<Button>(R.id.btnAsync).setOnClickListener { testAsync() }
         findViewById<Button>(R.id.btnImperativeApi).setOnClickListener { testImperativeApi() }
         findViewById<Button>(R.id.btnBatchWrite).setOnClickListener { testBatchWrite() }
+        findViewById<Button>(R.id.btnEditTtl).setOnClickListener { testEditWithTtlAndMarkChanged() }
         findViewById<Button>(R.id.btnGetOrPut).setOnClickListener { testGetOrPut() }
         findViewById<Button>(R.id.btnExportImport).setOnClickListener { testExportImport() }
         findViewById<Button>(R.id.btnMmkvInstance).setOnClickListener { testMmkvInstance() }
@@ -176,6 +187,15 @@ class MainActivity : AppCompatActivity() {
         log("[NULL] age = ${UserStore.age}")
     }
 
+    private fun testNullableWithDefault() {
+        NullableDefaultStore.clear()
+        log("[Nullable+default] 清空后 label=${NullableDefaultStore.label}")
+        NullableDefaultStore.label = "已写入"
+        log("[Nullable+default] 写入后 label=${NullableDefaultStore.label}")
+        NullableDefaultStore.label = null
+        log("[Nullable+default] 置 null 后（键删除）label=${NullableDefaultStore.label}")
+    }
+
     private fun testNullableOthers() {
         UserStore.nullableTimestamp = System.currentTimeMillis()
         UserStore.nullableScore = 88.5f
@@ -233,6 +253,16 @@ class MainActivity : AppCompatActivity() {
         JsonStore.putJson("json_imperative", UserInfo("Eve", "eve@test.com", 3))
         val imperative = JsonStore.getJson<UserInfo>("json_imperative")
         log("[JSON] imperative putJson/getJson: $imperative")
+
+        JsonStore.remove("json_getorput")
+        val goj = JsonStore.getOrPutJson("json_getorput") {
+            UserInfo("DefaultUser", "default@example.com", 0)
+        }
+        val goj2 = JsonStore.getOrPutJson("json_getorput") {
+            UserInfo("Ignored", "x@y.z", 99)
+        }
+        log("[JSON] getOrPutJson (1st): $goj")
+        log("[JSON] getOrPutJson (2nd, same key): $goj2")
         JsonStore.clear()
     }
 
@@ -264,21 +294,47 @@ class MainActivity : AppCompatActivity() {
         log("[Migration] SP → MMKV: $result")
     }
 
+    private fun testSpMigrationKeepSource() {
+        val name = "keep_prefs_${System.currentTimeMillis()}"
+        getSharedPreferences(name, MODE_PRIVATE).edit().putString("keep_k", "keep_v").commit()
+        val result = SpMigration.migrate(this, name, deleteAfterMigration = false)
+        val sp = getSharedPreferences(name, MODE_PRIVATE)
+        log("[Migration] deleteAfterMigration=false → $result")
+        log("  原 SP 仍可读: ${sp.getString("keep_k", null)}")
+        log("  MMKV 默认实例: ${UserStore.getString("keep_k")}")
+        UserStore.remove("keep_k")
+        sp.edit().clear().commit()
+    }
+
     private fun testContentChangeListener() {
-        UserStore.registerContentChange { mmapID ->
+        ipcListener = { mmapID ->
             runOnUiThread { log("[IPC] content changed: $mmapID") }
         }
+        UserStore.registerContentChange(listener = ipcListener!!)
         log("[IPC] listener registered. Try writing from another process.")
     }
 
     private fun testOnKeyChanged() {
-        UserStore.onKeyChanged { key ->
+        keyListener = { key ->
             runOnUiThread { log("[KeyChanged] $key") }
         }
+        UserStore.registerOnKeyChanged(keyListener!!)
         UserStore.putString("test_key", "test_value")
         UserStore.putInt("test_int", 42)
         UserStore.remove("test_key")
         log("[KeyChanged] listener registered and tested")
+    }
+
+    private fun unregisterDemoListeners() {
+        ipcListener?.let {
+            UserStore.unregisterContentChange(it)
+            ipcListener = null
+        }
+        keyListener?.let {
+            UserStore.unregisterOnKeyChanged(it)
+            keyListener = null
+        }
+        log("[OK] 已注销跨进程 / 单进程监听（若曾注册）")
     }
 
     private fun testSync() {
@@ -313,6 +369,16 @@ class MainActivity : AppCompatActivity() {
         UserStore.remove("batch_str", "batch_int", "batch_bool")
     }
 
+    private fun testEditWithTtlAndMarkChanged() {
+        val ttlKey = "demo_ttl_${System.currentTimeMillis() % 10000}"
+        UserStore.edit {
+            mmkv.encode(ttlKey, "expires_60s", 60)
+            markKeyChanged(ttlKey)
+        }
+        log("[TTL] encode with expire + markKeyChanged → ${UserStore.getString(ttlKey)}")
+        UserStore.remove(ttlKey)
+    }
+
     private fun testGetOrPut() {
         UserStore.remove("getorput_key")
         val v1 = UserStore.getOrPutString("getorput_key") { "first_default" }
@@ -323,6 +389,15 @@ class MainActivity : AppCompatActivity() {
 
         val count = UserStore.getOrPutInt("launch_count") { 0 }
         log("[GetOrPut] launch_count=$count")
+
+        UserStore.remove("getorput_set")
+        val set1 = UserStore.getOrPutStringSet("getorput_set") { setOf("a", "b") }
+        log("[GetOrPut] stringSet: $set1")
+
+        UserStore.remove("getorput_bytes")
+        val bytes = UserStore.getOrPutBytes("getorput_bytes") { byteArrayOf(0x0A, 0x0B) }
+        log("[GetOrPut] bytes: ${bytes.toList()}")
+        UserStore.remove("getorput_set", "getorput_bytes")
     }
 
     private fun testExportImport() {
@@ -334,8 +409,8 @@ class MainActivity : AppCompatActivity() {
         UserStore.clear()
         log("[Export] after clear: ${UserStore.getString("export_key")}")
 
-        val count = UserStore.importFromMap(data)
-        log("[Import] imported=$count, str=${UserStore.getString("export_key")}, int=${UserStore.getInt("export_int")}")
+        val count = UserStore.importFromMap(data, notifyKeyChanges = false)
+        log("[Import] imported=$count (notifyKeyChanges=false), str=${UserStore.getString("export_key")}, int=${UserStore.getInt("export_int")}")
         UserStore.remove("export_key", "export_int")
     }
 
@@ -368,6 +443,7 @@ class MainActivity : AppCompatActivity() {
         ParcelableStore.clear()
         BytesStore.clear()
         NullableSetStore.clear()
+        NullableDefaultStore.clear()
         JsonStore.clear()
         log("[OK] All stores cleared")
     }

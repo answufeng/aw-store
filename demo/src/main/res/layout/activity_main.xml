@@ -162,6 +162,14 @@
                             android:layout_marginTop="8dp"
                             android:text="Nullable Long/Float/Double/Boolean" />
 
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnNullableDefault"
+                            style="@style/MaterialButton.AwStore.Text"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="Nullable + default（缺省占位）" />
+
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
@@ -291,6 +299,14 @@
                         </LinearLayout>
 
                         <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnSpMigrationKeep"
+                            style="@style/MaterialButton.AwStore.Text"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="SP迁移（不删除原SP）" />
+
+                        <com.google.android.material.button.MaterialButton
                             android:id="@+id/btnContentChange"
                             style="@style/MaterialButton.AwStore.Outlined"
                             android:layout_width="match_parent"
@@ -305,6 +321,14 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="8dp"
                             android:text="注册单进程键变更回调" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnUnregisterListeners"
+                            style="@style/MaterialButton.AwStore.Text"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="注销跨进程/键变更监听" />
 
                         <LinearLayout
                             android:layout_width="match_parent"
@@ -369,6 +393,14 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:text="批量写入事务(edit)"
+                            android:layout_marginBottom="8dp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnEditTtl"
+                            style="@style/MaterialButton.AwStore.Text"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="edit + MMKV 过期写入 + markKeyChanged"
                             android:layout_marginBottom="8dp" />
 
                         <com.google.android.material.button.MaterialButton

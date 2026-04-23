@@ -32,6 +32,9 @@ jobs:
       - name: ktlint
         run: ./gradlew :aw-store:ktlintCheck
 
+      - name: Unit tests (aw-store)
+        run: ./gradlew :aw-store:testDebugUnitTest
+
       - name: Build demo
         run: ./gradlew :demo:assembleRelease
 

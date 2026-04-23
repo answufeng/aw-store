@@ -9,7 +9,11 @@ import java.io.File
 /**
  * MMKV 存储库的全局入口。
  *
- * 负责初始化 MMKV 引擎，必须在 [android.app.Application.onCreate] 中调用 [init]。
+ * **默认**：库通过 [AwStoreInitializer]（ContentProvider）在进程启动时自动调用 [init]，无需在 Application 中手写。
+ *
+ * **手动初始化**：仅在需要自定义 [rootDir]、或在 ContentProvider 之前必须访问存储等场景，在
+ * [android.app.Application.onCreate] 中调用 [init]；若已自动初始化，重复调用会保留首次的 `rootDir`，
+ * 但会应用最新的 `logEnabled`（详见 [init]）。
  *
  * ```kotlin
  * class MyApp : Application() {
@@ -74,7 +78,7 @@ object AwStore {
      */
     internal fun ensureInitialized() {
         check(initialized) {
-            "AwStore 尚未初始化，请先在 Application.onCreate() 中调用 AwStore.init(context)"
+            "AwStore 尚未初始化。请确认已合并库的 ContentProvider（自动初始化），或在 Application.onCreate() 中调用 AwStore.init(context)"
         }
     }
 

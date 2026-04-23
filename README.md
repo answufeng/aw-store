@@ -26,7 +26,7 @@
 
 ```kotlin
 dependencies {
-    implementation("com.github.answufeng:aw-store:1.0.0")
+    implementation("com.github.answufeng:aw-store:1.0.1")
 }
 ```
 

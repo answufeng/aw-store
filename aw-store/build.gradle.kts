@@ -36,6 +36,10 @@ android {
         abortOnError = true
         warningsAsErrors = false
     }
+
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
 }
 
 ktlint {
@@ -47,6 +51,10 @@ dependencies {
     api(libs.mmkv)
     implementation(libs.core.ktx)
     implementation(libs.annotation)
+
+    testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
 }
 
 apply(from = "${rootDir}/gradle/publish.gradle.kts")
