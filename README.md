@@ -4,6 +4,8 @@
 
 基于腾讯 **MMKV** 的 Android 键值存储封装：Kotlin **属性委托** + 命令式 API，支持加密、多 `mmapId`、多进程与 **SharedPreferences** 迁移。
 
+**当前版本**：**1.0.1**（与 Git tag / JitPack 一致；引入依赖见下文 `implementation` 坐标。）
+
 **环境**：demo 使用 compileSdk / targetSdk **35**，构建需 **JDK 17+**。
 
 ---
@@ -256,6 +258,13 @@ val results = SpMigration.migrateAll(this, listOf("a", "b"))
 - **本地**：`./gradlew :aw-store:assembleRelease :aw-store:ktlintCheck :aw-store:lintRelease :aw-store:testDebugUnitTest :demo:assembleRelease`（JDK 17+）。
 - **上线前**：确认 MMKV 根目录与备份；**CryptKey** 勿打日志；多进程与 `mmapId` 在真机验证。
 
+### 版本摘录
+
+| 标签 | 说明 |
+|------|------|
+| **1.0.1** | 修复 `public inline` 与 `getOrPutJson` / `MmkvEditScope` 的编译与 `@PublishedApi` 约束；收紧 consumer ProGuard；补充 Robolectric 单测与 CI；`importFromMap` 支持 `notifyKeyChanges`、BigInteger 安全导入等（详见提交历史）。 |
+| 1.0.0 | 首版能力与 README 结构整理。 |
+
 ### 密钥与加密（常见误用）
 
 | 误用 | 后果 | 建议 |
@@ -313,4 +322,4 @@ val results = SpMigration.migrateAll(this, listOf("a", "b"))
 
 Apache License 2.0，见 [LICENSE](LICENSE)。
 
-*文档修订：2026-04-23。*
+*文档修订：2026-04-24（与 1.0.1 同步）。*
