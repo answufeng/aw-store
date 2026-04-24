@@ -4,44 +4,37 @@
 
 基于腾讯 **MMKV** 的 Android 键值存储封装：Kotlin **属性委托** + 命令式 API，支持加密、多 `mmapId`、多进程与 **SharedPreferences** 迁移。
 
-**当前版本**：**1.0.1**（与 Git tag / JitPack 一致；引入依赖见下文 `implementation` 坐标。）
-
-**环境**：demo 使用 compileSdk / targetSdk **35**，构建需 **JDK 17+**。
+如果你只想最快接入并写入第一个键值，直接看下面的「5 分钟上手」即可；其它内容都可以后置按需查阅。
 
 ---
 
-## 目录
+## 5 分钟上手（最小接入）
 
-|  |  |
-|--|--|
-| [引入依赖](#引入依赖) | [快速开始](#快速开始) |
-| [功能一览](#功能一览) | [架构](#架构) |
-| [使用指南](#使用指南) | [开发与发版](#开发与发版) |
-| [演示应用](#演示应用) | [依赖与环境](#依赖与环境) |
-| [FAQ](#faq) · [注意事项](#注意事项) | [许可证](#许可证) |
-
----
-
-## 引入依赖
-
-`settings.gradle.kts` 增加 JitPack；`app/build.gradle.kts`：
+### 1) 添加依赖（JitPack）
 
 ```kotlin
+// settings.gradle.kts
+dependencyResolutionManagement {
+    repositories {
+        maven { url = uri("https://jitpack.io") }
+    }
+}
+
+// app/build.gradle.kts
 dependencies {
     implementation("com.github.answufeng:aw-store:1.0.1")
 }
 ```
 
-MMKV 通过本库以 **`api`** 传递，一般无需再单独声明。
+`implementation` 中的 **版本号与 Git / JitPack 的 tag 一致**（上例为 `1.0.1`）。  
+MMKV 通过本库以 **`api`** 方式传递，一般无需再额外声明。
 
 ---
 
-## 快速开始
+### 2) 初始化（自动 / 手动）
 
-### 初始化
-
-- **推荐**：内置 **ContentProvider** 自动初始化，引入后即可用。
-- **手动**（自定义根目录、日志等）：在 `Application.onCreate()` 中 `AwStore.init(this, …)`。
+- **默认**：内置 `ContentProvider` 自动初始化，引入依赖后即可用。
+- **手动**：需要自定义根目录、日志等时，在 `Application.onCreate()` 调用 `AwStore.init(...)`。
 
 ```kotlin
 class App : Application() {
@@ -52,11 +45,13 @@ class App : Application() {
 }
 ```
 
-`rootDir` 进程内以首次为准；若已初始化后又传入**不同** `rootDir`，Release **Log.w**，debuggable 包会抛 `IllegalStateException`。每次调用仍会应用最新的 **`logEnabled`**。
+注意：`rootDir` 在**同一进程**内以首次初始化为准；若已初始化后又传入不同 `rootDir`，Release 会 `Log.w`，debuggable 包会抛 `IllegalStateException`。每次调用仍会应用最新的 `logEnabled`。
 
 自定义目录示例：`AwStore.init(this, rootDir = "${filesDir}/mmkv_custom", logEnabled = true)`。
 
-### 定义与读写
+---
+
+### 3) 定义 Store 并读写（属性委托）
 
 ```kotlin
 object UserStore : MmkvDelegate() {
@@ -70,14 +65,39 @@ object UserStore : MmkvDelegate() {
 }
 
 UserStore.token = "abc123"
-UserStore.nickname = null  // 删除键
+val token = UserStore.token
+UserStore.nickname = null  // 赋 null = 删除键
 ```
 
 Key 可省略（默认用**属性名**），也可 `long("user_id", 0L)`。未初始化就访问存储会抛 `IllegalStateException`（请确认清单已合并 Provider 或已调用 `init`）。
 
 ---
 
-## 功能一览
+## 目录（按常见需求跳转）
+
+| 想做什么 | 跳转到 |
+|----------|--------|
+| 最短时间跑通依赖 / 初始化 / 第一次读写 | [5 分钟上手（最小接入）](#5-分钟上手最小接入) · [环境要求](#环境要求) |
+| 看看支持哪些类型、迁移、多进程、加密 | [功能概览](#功能概览) · [使用指南](#使用指南) |
+| JSON / Parcelable / getOrPut / 批量 edit | [使用指南](#使用指南) |
+| SharedPreferences 迁移 | [SharedPreferences 迁移](#sharedpreferences-迁移) |
+| 多进程监听与单进程监听 | [监听](#监听) |
+| 本地构建 / CI / Demo | [本仓库与工程检查](#本仓库与工程检查) |
+
+---
+
+## 环境要求
+
+| 项目 | 建议 / 最低 |
+|------|------------|
+| Android minSdk | 24 |
+| Demo compileSdk / targetSdk | 35 |
+| JDK | 17+ |
+| Kotlin | 2.0+ |
+
+---
+
+## 功能概览
 
 | 类别 | 能力 |
 |------|------|
@@ -252,18 +272,14 @@ val results = SpMigration.migrateAll(this, listOf("a", "b"))
 
 ---
 
-## 开发与发版
+## 集成约定与踩坑
 
-- **CI**：[`.github/workflows/ci.yml`](.github/workflows/ci.yml)（`assembleRelease`、`ktlintCheck`、`lintRelease`、单测、`demo` release）。
-- **本地**：`./gradlew :aw-store:assembleRelease :aw-store:ktlintCheck :aw-store:lintRelease :aw-store:testDebugUnitTest :demo:assembleRelease`（JDK 17+）。
-- **上线前**：确认 MMKV 根目录与备份；**CryptKey** 勿打日志；多进程与 `mmapId` 在真机验证。
-
-### 版本摘录
-
-| 标签 | 说明 |
+| 主题 | 说明 |
 |------|------|
-| **1.0.1** | 修复 `public inline` 与 `getOrPutJson` / `MmkvEditScope` 的编译与 `@PublishedApi` 约束；收紧 consumer ProGuard；补充 Robolectric 单测与 CI；`importFromMap` 支持 `notifyKeyChanges`、BigInteger 安全导入等（详见提交历史）。 |
-| 1.0.0 | 首版能力与 README 结构整理。 |
+| Key 默认值 | 省略 key 时，键名 = **属性名**；重命名属性会导致“读不到旧值”。请用显式 key 保持兼容：`long("user_id", 0L)`。 |
+| 赋 `null` 的语义 | `nullable*` 委托：赋 `null` = **删键**。 |
+| `CryptKey` | 不要把密钥写进仓库或日志；卸载重装后 `fromSecureRandom()` 会变化，旧数据将无法解密。 |
+| 多进程 | 同一份数据各进程需相同 `mmapId` 且 `multiProcess = true`；跨进程监听用 `registerContentChange`。 |
 
 ### 密钥与加密（常见误用）
 
@@ -275,20 +291,14 @@ val results = SpMigration.migrateAll(this, listOf("a", "b"))
 
 ---
 
-## 演示应用
+## 本仓库与工程检查
 
-模块 **`demo`**，能力索引：[demo/DEMO_MATRIX.md](demo/DEMO_MATRIX.md)；菜单含「演示清单」。
-
----
-
-## 依赖与环境
-
-|  | 版本 |
-|--|------|
-| MMKV | 2.0.1 |
-| minSdk | 24+ |
-| Kotlin | 2.0+ |
-| JDK | 17+ |
+| 项 | 说明 |
+|----|------|
+| Demo | 模块 `demo/`，能力索引：[demo/DEMO_MATRIX.md](demo/DEMO_MATRIX.md) |
+| 本地建议命令 | `./gradlew :aw-store:assembleRelease :aw-store:ktlintCheck :aw-store:lintRelease :aw-store:testDebugUnitTest :demo:assembleRelease`（需 **JDK 17+**） |
+| CI | [`.github/workflows/ci.yml`](.github/workflows/ci.yml)：assemble、ktlint、Lint、单测、demo release |
+| 贡献 | [CONTRIBUTING.md](CONTRIBUTING.md) |
 
 ---
 
