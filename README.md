@@ -22,11 +22,11 @@ dependencyResolutionManagement {
 
 // app/build.gradle.kts
 dependencies {
-    implementation("com.github.answufeng:aw-store:1.0.1")
+    implementation("com.github.answufeng:aw-store:1.0.2")
 }
 ```
 
-`implementation` 中的 **版本号与 Git / JitPack 的 tag 一致**（上例为 `1.0.1`）。  
+`implementation` 中的 **版本号与 Git / JitPack 的 tag 一致**（上例为 `1.0.2`）。  
 MMKV 通过本库以 **`api`** 方式传递，一般无需再额外声明。
 
 ---
@@ -332,4 +332,4 @@ val results = SpMigration.migrateAll(this, listOf("a", "b"))
 
 Apache License 2.0，见 [LICENSE](LICENSE)。
 
-*文档修订：2026-04-24（与 1.0.1 同步）。*
+*文档修订：2026-04-27（与 1.0.2 同步）。*
