@@ -316,6 +316,66 @@ open class MmkvDelegate(
         notifyKeyChanged(key)
     }
 
+    // --- TTL 便捷方法 ---
+
+    /**
+     * 写入字符串并设置过期时间（秒），过期后该 key 将返回空。
+     *
+     * 底层调用 MMKV 原生带过期时间的 [MMKV.encode] 重载。
+     */
+    fun putStringWithTtl(key: String, value: String, expireSeconds: Int) {
+        mmkv.encode(key, value, expireSeconds)
+        notifyKeyChanged(key)
+    }
+
+    /**
+     * 写入 Int 并设置过期时间（秒）。
+     */
+    fun putIntWithTtl(key: String, value: Int, expireSeconds: Int) {
+        mmkv.encode(key, value, expireSeconds)
+        notifyKeyChanged(key)
+    }
+
+    /**
+     * 写入 Long 并设置过期时间（秒）。
+     */
+    fun putLongWithTtl(key: String, value: Long, expireSeconds: Int) {
+        mmkv.encode(key, value, expireSeconds)
+        notifyKeyChanged(key)
+    }
+
+    /**
+     * 写入 Float 并设置过期时间（秒）。
+     */
+    fun putFloatWithTtl(key: String, value: Float, expireSeconds: Int) {
+        mmkv.encode(key, value, expireSeconds)
+        notifyKeyChanged(key)
+    }
+
+    /**
+     * 写入 Double 并设置过期时间（秒）。
+     */
+    fun putDoubleWithTtl(key: String, value: Double, expireSeconds: Int) {
+        mmkv.encode(key, value, expireSeconds)
+        notifyKeyChanged(key)
+    }
+
+    /**
+     * 写入 Boolean 并设置过期时间（秒）。
+     */
+    fun putBooleanWithTtl(key: String, value: Boolean, expireSeconds: Int) {
+        mmkv.encode(key, value, expireSeconds)
+        notifyKeyChanged(key)
+    }
+
+    /**
+     * 写入 ByteArray 并设置过期时间（秒）。
+     */
+    fun putBytesWithTtl(key: String, value: ByteArray, expireSeconds: Int) {
+        mmkv.encode(key, value, expireSeconds)
+        notifyKeyChanged(key)
+    }
+
     /**
      * 读取 Serializable 对象。
      *
@@ -1353,6 +1413,11 @@ private fun decodeValueForExport(m: MMKV, key: String): Any? {
     m.decodeStringSet(key, null as Set<String>?)?.let { return it }
     m.decodeString(key, null)?.let { return it }
     m.decodeBytes(key)?.let { return it }
+    val boolTrue = m.decodeBool(key, true)
+    val boolFalse = m.decodeBool(key, false)
+    if (boolTrue == boolFalse) {
+        return boolTrue
+    }
     m.decodeInt(key, Int.MAX_VALUE).takeIf { it != Int.MAX_VALUE }?.let { return it }
     m.decodeLong(key, Long.MAX_VALUE).takeIf { it != Long.MAX_VALUE }?.let { return it }
     m.decodeFloat(key, Float.NaN).takeIf { !it.isNaN() }?.let { return it }

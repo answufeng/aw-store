@@ -147,6 +147,20 @@ object UserStore : MmkvDelegate() {
 
 适合动态 key：`putString`/`getString`、`putInt`/`getInt`，以及 Long / Float / Double / Boolean / Bytes / StringSet、`putParcelable`/`getParcelable`、`putSerializable`/`getSerializable`、`putJson`/`getJson`。
 
+### TTL 便捷方法
+
+带过期时间的写入，底层使用 MMKV 原生 `encode(key, value, expireSeconds)`：
+
+```kotlin
+UserStore.putStringWithTtl("captcha", "abc123", expireSeconds = 300)
+UserStore.putIntWithTtl("retry_count", 3, expireSeconds = 60)
+UserStore.putBooleanWithTtl("promo_shown", true, expireSeconds = 86400)
+// 支持：putStringWithTtl / putIntWithTtl / putLongWithTtl / putFloatWithTtl
+//       putDoubleWithTtl / putBooleanWithTtl / putBytesWithTtl
+```
+
+过期后键仍存在但读取返回默认值；`contains` 仍为 `true`，`allKeys` 仍包含该键。
+
 ### 批量写入 `edit { }`
 
 ```kotlin
