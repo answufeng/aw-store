@@ -555,6 +555,12 @@ open class MmkvDelegate(
             }
             val existing = getJsonInternal(key, clazz)
             if (existing != null) return existing
+            if (mmkv.containsKey(key)) {
+                AwStoreLogger.w(
+                    "getOrPutJson: invalid JSON at key=$key, replacing with default",
+                    null
+                )
+            }
             val value = defaultValue()
             putJsonInternal(key, value, clazz)
             return value
@@ -708,7 +714,19 @@ open class MmkvDelegate(
     @PublishedApi
     internal fun <T : Any> getJsonInternal(key: String, clazz: KClass<T>): T? {
         val str = mmkv.decodeString(key, null) ?: return null
-        return AwStoreJsonAdapter.fromJson(str, clazz)
+        return decodeJsonOrNull(str, clazz, key)
+    }
+
+    private fun <T : Any> decodeJsonOrNull(raw: String, clazz: KClass<T>, keyForLog: String?): T? {
+        return try {
+            AwStoreJsonAdapter.fromJson(raw, clazz)
+        } catch (t: Throwable) {
+            AwStoreLogger.w(
+                "JSON decode failed for key=${keyForLog ?: "?"} type=${clazz.simpleName}: ${t.message}",
+                t
+            )
+            null
+        }
     }
 
     @PublishedApi
@@ -1301,7 +1319,7 @@ open class MmkvDelegate(
         override fun getValue(thisRef: Any?, property: KProperty<*>): T? {
             val k = key ?: property.name
             val str = mmkv.decodeString(k, null) ?: return default
-            return AwStoreJsonAdapter.fromJson(str, clazz)
+            return decodeJsonOrNull(str, clazz, k) ?: default
         }
 
         override fun setValue(thisRef: Any?, property: KProperty<*>, value: T?) {
