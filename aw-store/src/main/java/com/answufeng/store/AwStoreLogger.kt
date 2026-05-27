@@ -18,10 +18,12 @@ import android.util.Log
  * ```
  */
 object AwStoreLogger {
-
     /** 日志级别 */
     enum class Level {
-        DEBUG, INFO, WARN, ERROR
+        DEBUG,
+        INFO,
+        WARN,
+        ERROR,
     }
 
     /** 是否启用日志输出，默认 `false` */
@@ -58,14 +60,20 @@ object AwStoreLogger {
     }
 
     /** 输出 WARN 级别日志 */
-    fun w(msg: String, t: Throwable? = null) {
+    fun w(
+        msg: String,
+        t: Throwable? = null,
+    ) {
         if (enabled) {
             customLogger?.invoke(Level.WARN, "AwStore", msg, t) ?: Log.w("AwStore", msg, t)
         }
     }
 
     /** 输出 ERROR 级别日志 */
-    fun e(msg: String, t: Throwable? = null) {
+    fun e(
+        msg: String,
+        t: Throwable? = null,
+    ) {
         if (enabled) {
             customLogger?.invoke(Level.ERROR, "AwStore", msg, t) ?: Log.e("AwStore", msg, t)
         }

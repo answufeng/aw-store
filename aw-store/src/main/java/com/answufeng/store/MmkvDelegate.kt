@@ -3,8 +3,6 @@ package com.answufeng.store
 import android.os.Parcelable
 import com.tencent.mmkv.MMKV
 import com.tencent.mmkv.MMKVContentChangeNotification
-import java.math.BigDecimal
-import java.math.BigInteger
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.properties.ReadWriteProperty
@@ -34,9 +32,12 @@ import kotlin.reflect.KProperty
  * var userId by long("user_id", 0L)
  * ```
  *
- * 加密存储：
+ * 加密存储（生产环境请使用 Keystore 等持久化密钥，勿将密钥写入仓库）：
  * ```kotlin
- * object SecureStore : MmkvDelegate(secureCryptKey = CryptKey.fromSecureRandom()) {
+ * object SecureStore : MmkvDelegate(
+ *     mmapId = "secure",
+ *     secureCryptKey = CryptKey.fromString(keystoreBackedKey)
+ * ) {
  *     var password by string()
  * }
  * ```
@@ -63,18 +64,25 @@ open class MmkvDelegate(
     private val mmapId: String? = null,
     private val cryptKey: String? = null,
     private val secureCryptKey: CryptKey? = null,
-    private val multiProcess: Boolean = false
+    private val multiProcess: Boolean = false,
 ) {
-
     constructor(config: StoreConfig) : this(
         mmapId = config.mmapId,
         cryptKey = config.cryptKey,
         secureCryptKey = config.secureCryptKey,
-        multiProcess = config.multiProcess
+        multiProcess = config.multiProcess,
     )
 
     private val effectiveCryptKey: String?
         get() = secureCryptKey?.value ?: cryptKey
+
+    /**
+     * 当前实例在 MMKV 侧实际使用的 mmapId（与 [SpMigration.resolveEffectiveMmapId] 一致）。
+     *
+     * 用于 [registerContentChange] 的默认监听目标；单进程默认实例为 `"DefaultMMKV"`。
+     */
+    val effectiveMmapId: String
+        get() = SpMigration.resolveEffectiveMmapId(mmapId, effectiveCryptKey, multiProcess)
 
     @PublishedApi
     internal val mmkv: MMKV by lazy {
@@ -83,7 +91,7 @@ open class MmkvDelegate(
     }
 
     /**
-     * 获取底层 MMKV 实例，用于访问 MMKV 的高级功能（如 `trim`、`close` 等）。
+     * 获取底层 MMKV 实例，用于访问 MMKV 的高级功能（如 `trim`、`close`、带过期时间的 [MMKV.encode] 等）。
      *
      * 通常不需要直接使用此属性，库已封装了常用操作。
      */
@@ -91,11 +99,8 @@ open class MmkvDelegate(
 
     private val onKeyChangedListeners = CopyOnWriteArrayList<(String) -> Unit>()
 
-    /**
-     * 保证 [getOrPutString] 等同系列「先查后写」操作在同一代理实例上的原子性，避免并发下多次执行 default 回调。
-     * 粒度：每个 [MmkvDelegate] 实例一把锁；不同 store 互不阻塞。
-     */
-    private val getOrPutLock = Any()
+    /** 按 key 分锁，保证同一 key 的 [getOrPutString] 等「先查后写」原子性，不同 key 互不阻塞。 */
+    private val getOrPutLocks = ConcurrentHashMap<String, Any>()
 
     /**
      * 注册单进程内的键值变更回调。
@@ -104,20 +109,18 @@ open class MmkvDelegate(
      * 适用于同进程内的数据变化监听。跨进程数据变化请使用 [registerContentChange]。
      *
      * ```kotlin
-     * UserStore.onKeyChanged { key ->
+     * UserStore.registerOnKeyChanged { key ->
      *     Log.d("Store", "Key changed: $key")
      * }
      * ```
+     *
+     * 同一 [listener] 重复注册会触发多次回调。
      *
      * @param listener 回调函数，参数为变更的键名
      */
     fun registerOnKeyChanged(listener: (key: String) -> Unit) {
         onKeyChangedListeners.add(listener)
     }
-
-    /** @suppress 使用 [registerOnKeyChanged] 替代 */
-    @Deprecated("Use registerOnKeyChanged instead", ReplaceWith("registerOnKeyChanged(listener)"))
-    fun onKeyChanged(listener: (key: String) -> Unit) = registerOnKeyChanged(listener)
 
     /**
      * 取消单进程内的键值变更回调。
@@ -128,10 +131,6 @@ open class MmkvDelegate(
         onKeyChangedListeners.remove(listener)
     }
 
-    /** @suppress 使用 [unregisterOnKeyChanged] 替代 */
-    @Deprecated("Use unregisterOnKeyChanged instead", ReplaceWith("unregisterOnKeyChanged(listener)"))
-    fun removeOnKeyChanged(listener: (key: String) -> Unit) = unregisterOnKeyChanged(listener)
-
     /**
      * 取消所有单进程内的键值变更回调。
      */
@@ -141,8 +140,16 @@ open class MmkvDelegate(
 
     @PublishedApi
     internal fun notifyKeyChanged(key: String) {
-        onKeyChangedListeners.forEach { it(key) }
+        onKeyChangedListeners.forEach { listener ->
+            try {
+                listener(key)
+            } catch (e: Exception) {
+                AwStoreLogger.e("onKeyChanged listener failed for key=$key", e)
+            }
+        }
     }
+
+    private fun lockForGetOrPut(key: String): Any = getOrPutLocks.getOrPut(key) { Any() }
 
     /**
      * 清空当前 MMKV 实例中的所有键值对。
@@ -229,189 +236,161 @@ open class MmkvDelegate(
     }
 
     /** 读取字符串值。 */
-    fun getString(key: String, default: String = ""): String = mmkv.decodeString(key, default) ?: default
+    fun getString(
+        key: String,
+        default: String = "",
+    ): String = mmkv.decodeString(key, default) ?: default
 
     /** 写入字符串值，写入后触发键变更通知。 */
-    fun putString(key: String, value: String) {
+    fun putString(
+        key: String,
+        value: String,
+    ) {
         mmkv.encode(key, value)
         notifyKeyChanged(key)
     }
 
     /** 读取整数值。 */
-    fun getInt(key: String, default: Int = 0): Int = mmkv.decodeInt(key, default)
+    fun getInt(
+        key: String,
+        default: Int = 0,
+    ): Int = mmkv.decodeInt(key, default)
 
     /** 写入整数值，写入后触发键变更通知。 */
-    fun putInt(key: String, value: Int) {
+    fun putInt(
+        key: String,
+        value: Int,
+    ) {
         mmkv.encode(key, value)
         notifyKeyChanged(key)
     }
 
     /** 读取长整数值。 */
-    fun getLong(key: String, default: Long = 0L): Long = mmkv.decodeLong(key, default)
+    fun getLong(
+        key: String,
+        default: Long = 0L,
+    ): Long = mmkv.decodeLong(key, default)
 
     /** 写入长整数值，写入后触发键变更通知。 */
-    fun putLong(key: String, value: Long) {
+    fun putLong(
+        key: String,
+        value: Long,
+    ) {
         mmkv.encode(key, value)
         notifyKeyChanged(key)
     }
 
     /** 读取浮点数值。 */
-    fun getFloat(key: String, default: Float = 0f): Float = mmkv.decodeFloat(key, default)
+    fun getFloat(
+        key: String,
+        default: Float = 0f,
+    ): Float = mmkv.decodeFloat(key, default)
 
     /** 写入浮点数值，写入后触发键变更通知。 */
-    fun putFloat(key: String, value: Float) {
+    fun putFloat(
+        key: String,
+        value: Float,
+    ) {
         mmkv.encode(key, value)
         notifyKeyChanged(key)
     }
 
     /** 读取双精度浮点数值。 */
-    fun getDouble(key: String, default: Double = 0.0): Double = mmkv.decodeDouble(key, default)
+    fun getDouble(
+        key: String,
+        default: Double = 0.0,
+    ): Double = mmkv.decodeDouble(key, default)
 
     /** 写入双精度浮点数值，写入后触发键变更通知。 */
-    fun putDouble(key: String, value: Double) {
+    fun putDouble(
+        key: String,
+        value: Double,
+    ) {
         mmkv.encode(key, value)
         notifyKeyChanged(key)
     }
 
     /** 读取布尔值。 */
-    fun getBoolean(key: String, default: Boolean = false): Boolean = mmkv.decodeBool(key, default)
+    fun getBoolean(
+        key: String,
+        default: Boolean = false,
+    ): Boolean = mmkv.decodeBool(key, default)
 
     /** 写入布尔值，写入后触发键变更通知。 */
-    fun putBoolean(key: String, value: Boolean) {
+    fun putBoolean(
+        key: String,
+        value: Boolean,
+    ) {
         mmkv.encode(key, value)
         notifyKeyChanged(key)
     }
 
     /** 读取字节数组。 */
-    fun getBytes(key: String, default: ByteArray = EMPTY_BYTE_ARRAY): ByteArray = mmkv.decodeBytes(key, default) ?: default
+    fun getBytes(
+        key: String,
+        default: ByteArray = EMPTY_BYTE_ARRAY,
+    ): ByteArray = mmkv.decodeBytes(key, default) ?: default
 
     /** 写入字节数组，写入后触发键变更通知。 */
-    fun putBytes(key: String, value: ByteArray) {
+    fun putBytes(
+        key: String,
+        value: ByteArray,
+    ) {
         mmkv.encode(key, value)
         notifyKeyChanged(key)
     }
 
     /** 读取字符串集合。 */
-    fun getStringSet(key: String, default: Set<String> = emptySet()): Set<String> = mmkv.decodeStringSet(key, default) ?: default
+    fun getStringSet(
+        key: String,
+        default: Set<String> = emptySet(),
+    ): Set<String> = mmkv.decodeStringSet(key, default) ?: default
 
     /** 写入字符串集合，写入后触发键变更通知。 */
-    fun putStringSet(key: String, value: Set<String>) {
+    fun putStringSet(
+        key: String,
+        value: Set<String>,
+    ) {
         mmkv.encode(key, value)
         notifyKeyChanged(key)
     }
 
     /** 读取 Parcelable 对象。 */
-    fun <T : Parcelable> getParcelable(key: String, clazz: Class<T>, default: T? = null): T? {
+    fun <T : Parcelable> getParcelable(
+        key: String,
+        clazz: Class<T>,
+        default: T? = null,
+    ): T? {
         return mmkv.decodeParcelable(key, clazz, default)
     }
 
     /** 读取 Parcelable 对象（reified 泛型版本）。 */
-    inline fun <reified T : Parcelable> getParcelable(key: String, default: T? = null): T? {
+    inline fun <reified T : Parcelable> getParcelable(
+        key: String,
+        default: T? = null,
+    ): T? {
         return getParcelable(key, T::class.java, default)
     }
 
     /** 写入 Parcelable 对象，写入后触发键变更通知。 */
-    fun <T : Parcelable> putParcelable(key: String, value: T) {
+    fun <T : Parcelable> putParcelable(
+        key: String,
+        value: T,
+    ) {
         mmkv.encode(key, value)
-        notifyKeyChanged(key)
-    }
-
-    // --- TTL 便捷方法 ---
-
-    /**
-     * 写入字符串并设置过期时间（秒），过期后该 key 将返回空。
-     *
-     * 底层调用 MMKV 原生带过期时间的 [MMKV.encode] 重载。
-     */
-    fun putStringWithTtl(key: String, value: String, expireSeconds: Int) {
-        mmkv.encode(key, value, expireSeconds)
-        notifyKeyChanged(key)
-    }
-
-    /**
-     * 写入 Int 并设置过期时间（秒）。
-     */
-    fun putIntWithTtl(key: String, value: Int, expireSeconds: Int) {
-        mmkv.encode(key, value, expireSeconds)
-        notifyKeyChanged(key)
-    }
-
-    /**
-     * 写入 Long 并设置过期时间（秒）。
-     */
-    fun putLongWithTtl(key: String, value: Long, expireSeconds: Int) {
-        mmkv.encode(key, value, expireSeconds)
-        notifyKeyChanged(key)
-    }
-
-    /**
-     * 写入 Float 并设置过期时间（秒）。
-     */
-    fun putFloatWithTtl(key: String, value: Float, expireSeconds: Int) {
-        mmkv.encode(key, value, expireSeconds)
-        notifyKeyChanged(key)
-    }
-
-    /**
-     * 写入 Double 并设置过期时间（秒）。
-     */
-    fun putDoubleWithTtl(key: String, value: Double, expireSeconds: Int) {
-        mmkv.encode(key, value, expireSeconds)
-        notifyKeyChanged(key)
-    }
-
-    /**
-     * 写入 Boolean 并设置过期时间（秒）。
-     */
-    fun putBooleanWithTtl(key: String, value: Boolean, expireSeconds: Int) {
-        mmkv.encode(key, value, expireSeconds)
-        notifyKeyChanged(key)
-    }
-
-    /**
-     * 写入 ByteArray 并设置过期时间（秒）。
-     */
-    fun putBytesWithTtl(key: String, value: ByteArray, expireSeconds: Int) {
-        mmkv.encode(key, value, expireSeconds)
-        notifyKeyChanged(key)
-    }
-
-    /**
-     * 读取 Serializable 对象。
-     *
-     * 注意：Java 序列化性能较差且存在兼容性风险，推荐使用 [parcelable] 或 [json] 替代。
-     */
-    inline fun <reified T : java.io.Serializable> getSerializable(key: String, default: T? = null): T? {
-        val bytes = mmkv.decodeBytes(key) ?: return default
-        return try {
-            java.io.ByteArrayInputStream(bytes).use { bis ->
-                java.io.ObjectInputStream(bis).use { ois ->
-                    ois.readObject() as? T
-                }
-            }
-        } catch (e: Exception) {
-            AwStoreLogger.w("getSerializable failed for key=$key", e)
-            default
-        }
-    }
-
-    /** 写入 Serializable 对象，写入后触发键变更通知。推荐使用 [putParcelable] 或 [putJson] 替代。 */
-    fun <T : java.io.Serializable> putSerializable(key: String, value: T) {
-        val bos = java.io.ByteArrayOutputStream()
-        java.io.ObjectOutputStream(bos).use { oos ->
-            oos.writeObject(value)
-        }
-        mmkv.encode(key, bos.toByteArray())
         notifyKeyChanged(key)
     }
 
     /**
      * 读取字符串值，若 key 不存在则写入 [defaultValue] 并返回。
      *
-     * 写入后会触发键变更通知。同一 [MmkvDelegate] 实例上并发调用时，[defaultValue] 至多执行一次（见 [getOrPutLock]）。
+     * 写入后会触发键变更通知。同一 key 上并发调用时，[defaultValue] 至多执行一次。
      */
-    fun getOrPutString(key: String, defaultValue: () -> String): String {
-        synchronized(getOrPutLock) {
+    fun getOrPutString(
+        key: String,
+        defaultValue: () -> String,
+    ): String {
+        synchronized(lockForGetOrPut(key)) {
             if (!mmkv.containsKey(key)) {
                 val value = defaultValue()
                 mmkv.encode(key, value)
@@ -426,8 +405,11 @@ open class MmkvDelegate(
      * 读取整数值，若 key 不存在则写入 [defaultValue] 并返回。写入后触发键变更通知。
      * 同一实例上 [defaultValue] 在并发下至多执行一次。
      */
-    fun getOrPutInt(key: String, defaultValue: () -> Int): Int {
-        synchronized(getOrPutLock) {
+    fun getOrPutInt(
+        key: String,
+        defaultValue: () -> Int,
+    ): Int {
+        synchronized(lockForGetOrPut(key)) {
             if (!mmkv.containsKey(key)) {
                 val value = defaultValue()
                 mmkv.encode(key, value)
@@ -440,10 +422,13 @@ open class MmkvDelegate(
 
     /**
      * 读取长整数值，若 key 不存在则写入 [defaultValue] 并返回。写入后触发键变更通知。
-     * 同一实例上 [defaultValue] 在并发下至多执行一次。
+     * 同一 key 上 [defaultValue] 在并发下至多执行一次。
      */
-    fun getOrPutLong(key: String, defaultValue: () -> Long): Long {
-        synchronized(getOrPutLock) {
+    fun getOrPutLong(
+        key: String,
+        defaultValue: () -> Long,
+    ): Long {
+        synchronized(lockForGetOrPut(key)) {
             if (!mmkv.containsKey(key)) {
                 val value = defaultValue()
                 mmkv.encode(key, value)
@@ -458,8 +443,11 @@ open class MmkvDelegate(
      * 读取布尔值，若 key 不存在则写入 [defaultValue] 并返回。写入后触发键变更通知。
      * 同一实例上 [defaultValue] 在并发下至多执行一次。
      */
-    fun getOrPutBoolean(key: String, defaultValue: () -> Boolean): Boolean {
-        synchronized(getOrPutLock) {
+    fun getOrPutBoolean(
+        key: String,
+        defaultValue: () -> Boolean,
+    ): Boolean {
+        synchronized(lockForGetOrPut(key)) {
             if (!mmkv.containsKey(key)) {
                 val value = defaultValue()
                 mmkv.encode(key, value)
@@ -472,10 +460,13 @@ open class MmkvDelegate(
 
     /**
      * 读取浮点数值，若 key 不存在则写入 [defaultValue] 并返回。写入后触发键变更通知。
-     * 同一实例上 [defaultValue] 在并发下至多执行一次。
+     * 同一 key 上 [defaultValue] 在并发下至多执行一次。
      */
-    fun getOrPutFloat(key: String, defaultValue: () -> Float): Float {
-        synchronized(getOrPutLock) {
+    fun getOrPutFloat(
+        key: String,
+        defaultValue: () -> Float,
+    ): Float {
+        synchronized(lockForGetOrPut(key)) {
             if (!mmkv.containsKey(key)) {
                 val value = defaultValue()
                 mmkv.encode(key, value)
@@ -490,8 +481,11 @@ open class MmkvDelegate(
      * 读取双精度浮点数值，若 key 不存在则写入 [defaultValue] 并返回。写入后触发键变更通知。
      * 同一实例上 [defaultValue] 在并发下至多执行一次。
      */
-    fun getOrPutDouble(key: String, defaultValue: () -> Double): Double {
-        synchronized(getOrPutLock) {
+    fun getOrPutDouble(
+        key: String,
+        defaultValue: () -> Double,
+    ): Double {
+        synchronized(lockForGetOrPut(key)) {
             if (!mmkv.containsKey(key)) {
                 val value = defaultValue()
                 mmkv.encode(key, value)
@@ -504,10 +498,13 @@ open class MmkvDelegate(
 
     /**
      * 读取字符串集合，若 key 不存在则写入 [defaultValue] 并返回。写入后触发键变更通知。
-     * 同一实例上 [defaultValue] 在并发下至多执行一次。
+     * 同一 key 上 [defaultValue] 在并发下至多执行一次。
      */
-    fun getOrPutStringSet(key: String, defaultValue: () -> Set<String>): Set<String> {
-        synchronized(getOrPutLock) {
+    fun getOrPutStringSet(
+        key: String,
+        defaultValue: () -> Set<String>,
+    ): Set<String> {
+        synchronized(lockForGetOrPut(key)) {
             if (!mmkv.containsKey(key)) {
                 val value = defaultValue()
                 mmkv.encode(key, value)
@@ -522,8 +519,11 @@ open class MmkvDelegate(
      * 读取字节数组，若 key 不存在则写入 [defaultValue] 并返回。写入后触发键变更通知。
      * 同一实例上 [defaultValue] 在并发下至多执行一次。
      */
-    fun getOrPutBytes(key: String, defaultValue: () -> ByteArray): ByteArray {
-        synchronized(getOrPutLock) {
+    fun getOrPutBytes(
+        key: String,
+        defaultValue: () -> ByteArray,
+    ): ByteArray {
+        synchronized(lockForGetOrPut(key)) {
             if (!mmkv.containsKey(key)) {
                 val value = defaultValue()
                 mmkv.encode(key, value)
@@ -537,17 +537,26 @@ open class MmkvDelegate(
     /**
      * 读取 JSON 对象；若 key 不存在则序列化 [defaultValue] 的结果并写入后返回。
      *
-     * 若 key 存在但反序列化失败（损坏或非 JSON），则视为需重建：会用 [defaultValue] 覆盖写入并返回新值。
+     * 若 key 存在但反序列化失败（损坏或非 JSON），默认（[recoverOnParseError] 为 `true`）会用 [defaultValue]
+     * 覆盖写入并返回新值；设为 `false` 时仅打日志、不覆写，返回 [defaultValue] 的执行结果但不写入。
      * 使用前须已注册 [AwStoreJsonAdapter]。
      *
-     * 同一实例上「缺失时的 default」在并发下至多执行一次（与 [getOrPutString] 相同锁）。
+     * 同一 key 上「缺失时的 default」在并发下至多执行一次。
      */
-    inline fun <reified T : Any> getOrPutJson(key: String, noinline defaultValue: () -> T): T =
-        getOrPutJsonImpl(key, T::class, defaultValue)
+    inline fun <reified T : Any> getOrPutJson(
+        key: String,
+        recoverOnParseError: Boolean = true,
+        noinline defaultValue: () -> T,
+    ): T = getOrPutJsonImpl(key, T::class, recoverOnParseError, defaultValue)
 
     @PublishedApi
-    internal fun <T : Any> getOrPutJsonImpl(key: String, clazz: KClass<T>, defaultValue: () -> T): T {
-        synchronized(getOrPutLock) {
+    internal fun <T : Any> getOrPutJsonImpl(
+        key: String,
+        clazz: KClass<T>,
+        recoverOnParseError: Boolean,
+        defaultValue: () -> T,
+    ): T {
+        synchronized(lockForGetOrPut(key)) {
             if (!mmkv.containsKey(key)) {
                 val value = defaultValue()
                 putJsonInternal(key, value, clazz)
@@ -557,12 +566,15 @@ open class MmkvDelegate(
             if (existing != null) return existing
             if (mmkv.containsKey(key)) {
                 AwStoreLogger.w(
-                    "getOrPutJson: invalid JSON at key=$key, replacing with default",
-                    null
+                    "getOrPutJson: invalid JSON at key=$key" +
+                        if (recoverOnParseError) ", replacing with default" else ", not overwriting",
+                    null,
                 )
             }
             val value = defaultValue()
-            putJsonInternal(key, value, clazz)
+            if (recoverOnParseError) {
+                putJsonInternal(key, value, clazz)
+            }
             return value
         }
     }
@@ -571,7 +583,9 @@ open class MmkvDelegate(
      * 导出当前存储的所有键值对为 Map。
      *
      * 支持的类型：String、Int、Long、Float、Double、Boolean、ByteArray、Set\<String\>。
-     * 其他类型（如 Parcelable、Serializable、JSON）以原始字节或字符串形式导出。
+     * 其他类型（如 Parcelable、JSON）以原始字节或字符串形式导出。
+     *
+     * **调试 / 简单迁移专用**，勿用于生产级严谨备份。
      *
      * **说明**：MMKV 在存储侧按类型做区分，但公开 API 不提供按 key 查询值类型的能力。本方法按固定顺序
      * 试解码，对绝大多数「每个 key 只使用一种 [encode] 类型」的数据是正确的；`Boolean` 与 `Int`（例如
@@ -590,16 +604,21 @@ open class MmkvDelegate(
     /**
      * 从 Map 导入键值对到当前存储。
      *
-     * 支持的类型：String、Int、Long、Float、Double、Boolean、ByteArray、Set\<String\>、[Byte]、[Short]、
-     * [java.math.BigDecimal]、[java.math.BigInteger]（[BigInteger] 须落在 [Long] 精确范围内，否则跳过并记 WARN；[BigDecimal] 以 [Double] 存储可能有精度损失）；`null` 会删除该 key。已存在的键会被覆盖。
+     * 支持的类型：String、Int、Long、Float、Double、Boolean、ByteArray、Set\<String\>；`null` 会删除该 key。已存在的键会被覆盖。
+     * 本方法面向调试与简单迁移，勿用于生产级严谨备份（见 [exportToMap]）。
      *
      * 不支持的 [Map] 项会被跳过，并在 [AwStoreLogger.enabled] 为 `true` 时打 WARN 日志，便于排查问题。
      *
-     * @param notifyKeyChanges 为 `true`（默认）时每成功写入/删除立即触发 [registerOnKeyChanged]；为 `false` 时在整次导入结束后按 key 去重各触发一次，适合大批量导入以减少 UI 刷新次数。
+     * @param notifyKeyChanges 为 `true`（默认）时每成功写入/删除立即触发 [registerOnKeyChanged]；
+     *        为 `false` 时在整次导入结束后按 key 去重各触发一次，适合大批量导入。
      * @return 成功写入或删除（`null` 项）的键数量
      */
-    fun importFromMap(map: Map<String, Any?>, notifyKeyChanges: Boolean = true): Int {
+    fun importFromMap(
+        map: Map<String, Any?>,
+        notifyKeyChanges: Boolean = true,
+    ): Int {
         val deferredNotify = if (notifyKeyChanges) null else mutableSetOf<String>()
+
         fun onKeyImported(key: String) {
             if (notifyKeyChanges) {
                 notifyKeyChanged(key)
@@ -659,36 +678,11 @@ open class MmkvDelegate(
                             count++
                         } else {
                             skipped++
-                            AwStoreLogger.w("importFromMap: skip key=\"$key\", Set must contain only String (got ${value.map { it?.javaClass?.simpleName }})")
+                            val types = value.map { it?.javaClass?.simpleName }
+                            AwStoreLogger.w(
+                                "importFromMap: skip key=\"$key\", Set must contain only String (got $types)",
+                            )
                         }
-                    }
-                }
-                is Byte -> {
-                    mmkv.encode(key, value.toInt())
-                    onKeyImported(key)
-                    count++
-                }
-                is Short -> {
-                    mmkv.encode(key, value.toInt())
-                    onKeyImported(key)
-                    count++
-                }
-                is BigDecimal -> {
-                    mmkv.encode(key, value.toDouble())
-                    onKeyImported(key)
-                    count++
-                }
-                is BigInteger -> {
-                    try {
-                        val longVal = value.longValueExact()
-                        mmkv.encode(key, longVal)
-                        onKeyImported(key)
-                        count++
-                    } catch (_: ArithmeticException) {
-                        skipped++
-                        AwStoreLogger.w(
-                            "importFromMap: skip key=\"$key\", BigInteger out of Long range: $value"
-                        )
                     }
                 }
                 null -> {
@@ -712,25 +706,36 @@ open class MmkvDelegate(
     }
 
     @PublishedApi
-    internal fun <T : Any> getJsonInternal(key: String, clazz: KClass<T>): T? {
+    internal fun <T : Any> getJsonInternal(
+        key: String,
+        clazz: KClass<T>,
+    ): T? {
         val str = mmkv.decodeString(key, null) ?: return null
         return decodeJsonOrNull(str, clazz, key)
     }
 
-    private fun <T : Any> decodeJsonOrNull(raw: String, clazz: KClass<T>, keyForLog: String?): T? {
+    private fun <T : Any> decodeJsonOrNull(
+        raw: String,
+        clazz: KClass<T>,
+        keyForLog: String?,
+    ): T? {
         return try {
             AwStoreJsonAdapter.fromJson(raw, clazz)
         } catch (t: Throwable) {
             AwStoreLogger.w(
                 "JSON decode failed for key=${keyForLog ?: "?"} type=${clazz.simpleName}: ${t.message}",
-                t
+                t,
             )
             null
         }
     }
 
     @PublishedApi
-    internal fun <T : Any> putJsonInternal(key: String, value: T, clazz: KClass<T>) {
+    internal fun <T : Any> putJsonInternal(
+        key: String,
+        value: T,
+        clazz: KClass<T>,
+    ) {
         mmkv.encode(key, AwStoreJsonAdapter.toJson(value, clazz))
         notifyKeyChanged(key)
     }
@@ -756,7 +761,10 @@ open class MmkvDelegate(
      * @param value 要存储的对象
      * @throws IllegalStateException 未设置 JSON 适配器时抛出
      */
-    inline fun <reified T : Any> putJson(key: String, value: T) = putJsonInternal(key, value, T::class)
+    inline fun <reified T : Any> putJson(
+        key: String,
+        value: T,
+    ) = putJsonInternal(key, value, T::class)
 
     private val contentChangeListeners = ConcurrentHashMap<String, CopyOnWriteArrayList<(String) -> Unit>>()
 
@@ -778,13 +786,23 @@ open class MmkvDelegate(
         private val globalLock = Any()
         private val allListeners = ConcurrentHashMap<String, CopyOnWriteArrayList<(String) -> Unit>>()
 
-        private val globalNotification = object : MMKVContentChangeNotification {
-            override fun onContentChangedByOuterProcess(mmapID: String) {
-                allListeners[mmapID]?.forEach { it(mmapID) }
+        private val globalNotification =
+            object : MMKVContentChangeNotification {
+                override fun onContentChangedByOuterProcess(mmapID: String) {
+                    allListeners[mmapID]?.forEach { listener ->
+                        try {
+                            listener(mmapID)
+                        } catch (e: Exception) {
+                            AwStoreLogger.e("contentChange listener failed for mmapID=$mmapID", e)
+                        }
+                    }
+                }
             }
-        }
 
-        internal fun registerGlobalNotification(targetMmapId: String, listener: (String) -> Unit) {
+        internal fun registerGlobalNotification(
+            targetMmapId: String,
+            listener: (String) -> Unit,
+        ) {
             allListeners.getOrPut(targetMmapId) { CopyOnWriteArrayList() }.add(listener)
             if (!globalNotificationRegistered) {
                 synchronized(globalLock) {
@@ -839,14 +857,14 @@ open class MmkvDelegate(
      * 当其他进程修改了 MMKV 数据时，[listener] 会被回调，参数为被修改的 MMKV 实例 ID。
      * 当前进程的修改不会触发回调。支持按 mmapId 过滤，多个 listener 不会互相覆盖。
      *
-     * @param targetMmapId 监听的目标 MMKV 实例 ID，默认为当前实例的 mmapId
-     * @param listener 回调函数，参数为被修改的 MMKV 实例 ID
+     * @param targetMmapId 监听的目标 MMKV 实例 ID，默认为 [effectiveMmapId]（与 [SpMigration.resolveEffectiveMmapId] 一致）
+     * @param listener 回调函数，参数为被修改的 MMKV 实例 ID。同一 listener 重复注册会触发多次回调。
      */
     fun registerContentChange(
         targetMmapId: String? = null,
-        listener: (mmapID: String) -> Unit
+        listener: (mmapID: String) -> Unit,
     ) {
-        val id = targetMmapId ?: (mmapId ?: "DefaultMMKV")
+        val id = targetMmapId ?: effectiveMmapId
         contentChangeListeners.getOrPut(id) { CopyOnWriteArrayList() }.add(listener)
         registerGlobalNotification(id, listener)
     }
@@ -869,18 +887,10 @@ open class MmkvDelegate(
      * @param key MMKV 键名，为 null 时自动使用属性名
      * @param default 默认值
      */
-    fun string(key: String? = null, default: String = "") = object : ReadWriteProperty<Any?, String> {
-        override fun getValue(thisRef: Any?, property: KProperty<*>): String {
-            val k = key ?: property.name
-            return mmkv.decodeString(k, default) ?: default
-        }
-
-        override fun setValue(thisRef: Any?, property: KProperty<*>, value: String) {
-            val k = key ?: property.name
-            mmkv.encode(k, value)
-            notifyKeyChanged(k)
-        }
-    }
+    fun string(
+        key: String? = null,
+        default: String = "",
+    ) = MmkvDelegateFactories.stringProperty(mmkv, ::notifyKeyChanged, key, default)
 
     /**
      * Nullable String 类型属性委托，赋值 null 时删除对应键。
@@ -888,307 +898,102 @@ open class MmkvDelegate(
      * @param key MMKV 键名，为 null 时自动使用属性名
      * @param default key 不存在时的默认值，默认 null
      */
-    fun nullableString(key: String? = null, default: String? = null) = object : ReadWriteProperty<Any?, String?> {
-        override fun getValue(thisRef: Any?, property: KProperty<*>): String? {
-            val k = key ?: property.name
-            return if (mmkv.containsKey(k)) mmkv.decodeString(k, default) else default
-        }
+    fun nullableString(
+        key: String? = null,
+        default: String? = null,
+    ) = MmkvDelegateFactories.nullableStringProperty(mmkv, ::notifyKeyChanged, key, default)
 
-        override fun setValue(thisRef: Any?, property: KProperty<*>, value: String?) {
-            val k = key ?: property.name
-            if (value != null) {
-                mmkv.encode(k, value)
-            } else {
-                mmkv.removeValueForKey(k)
-            }
-            notifyKeyChanged(k)
-        }
-    }
+    /** @param key MMKV 键名，为 null 时自动使用属性名；@param default 默认值 */
+    fun int(
+        key: String? = null,
+        default: Int = 0,
+    ) = MmkvDelegateFactories.intProperty(mmkv, ::notifyKeyChanged, key, default)
 
     /**
-     * Int 类型属性委托。
-     *
-     * @param key MMKV 键名，为 null 时自动使用属性名
-     * @param default 默认值
+     * Nullable Int 类型属性委托；key 不存在时返回 [default]，赋值 null 时删除对应键。
      */
-    fun int(key: String? = null, default: Int = 0) = object : ReadWriteProperty<Any?, Int> {
-        override fun getValue(thisRef: Any?, property: KProperty<*>): Int {
-            val k = key ?: property.name
-            return mmkv.decodeInt(k, default)
-        }
+    fun nullableInt(
+        key: String? = null,
+        default: Int? = null,
+    ) = MmkvDelegateFactories.nullableIntProperty(mmkv, ::notifyKeyChanged, key, default)
 
-        override fun setValue(thisRef: Any?, property: KProperty<*>, value: Int) {
-            val k = key ?: property.name
-            mmkv.encode(k, value)
-            notifyKeyChanged(k)
-        }
-    }
+    /** @param key MMKV 键名，为 null 时自动使用属性名；@param default 默认值 */
+    fun long(
+        key: String? = null,
+        default: Long = 0L,
+    ) = MmkvDelegateFactories.longProperty(mmkv, ::notifyKeyChanged, key, default)
+
+    /** Nullable Long 类型属性委托。 */
+    fun nullableLong(
+        key: String? = null,
+        default: Long? = null,
+    ) = MmkvDelegateFactories.nullableLongProperty(mmkv, ::notifyKeyChanged, key, default)
+
+    /** @param key MMKV 键名，为 null 时自动使用属性名；@param default 默认值 */
+    fun float(
+        key: String? = null,
+        default: Float = 0f,
+    ) = MmkvDelegateFactories.floatProperty(mmkv, ::notifyKeyChanged, key, default)
+
+    /** Nullable Float 类型属性委托。 */
+    fun nullableFloat(
+        key: String? = null,
+        default: Float? = null,
+    ) = MmkvDelegateFactories.nullableFloatProperty(mmkv, ::notifyKeyChanged, key, default)
+
+    /** @param key MMKV 键名，为 null 时自动使用属性名；@param default 默认值 */
+    fun double(
+        key: String? = null,
+        default: Double = 0.0,
+    ) = MmkvDelegateFactories.doubleProperty(mmkv, ::notifyKeyChanged, key, default)
+
+    /** Nullable Double 类型属性委托。 */
+    fun nullableDouble(
+        key: String? = null,
+        default: Double? = null,
+    ) = MmkvDelegateFactories.nullableDoubleProperty(mmkv, ::notifyKeyChanged, key, default)
+
+    /** @param key MMKV 键名，为 null 时自动使用属性名；@param default 默认值 */
+    fun boolean(
+        key: String? = null,
+        default: Boolean = false,
+    ) = MmkvDelegateFactories.booleanProperty(mmkv, ::notifyKeyChanged, key, default)
 
     /**
-     * Nullable Int 类型属性委托。
-     *
-     * key 不存在时返回 null，赋值 null 时删除对应键。
-     * 可区分"key 不存在"和"值为 0"的场景。
-     *
-     * @param key MMKV 键名，为 null 时自动使用属性名
-     * @param default key 不存在时的默认值，默认 null
+     * Nullable Boolean 类型属性委托；可区分「key 不存在」与「值为 false」。
      */
-    fun nullableInt(key: String? = null, default: Int? = null) = object : ReadWriteProperty<Any?, Int?> {
-        override fun getValue(thisRef: Any?, property: KProperty<*>): Int? {
-            val k = key ?: property.name
-            return if (mmkv.containsKey(k)) mmkv.decodeInt(k) else default
-        }
+    fun nullableBoolean(
+        key: String? = null,
+        default: Boolean? = null,
+    ) = MmkvDelegateFactories.nullableBooleanProperty(mmkv, ::notifyKeyChanged, key, default)
 
-        override fun setValue(thisRef: Any?, property: KProperty<*>, value: Int?) {
-            val k = key ?: property.name
-            if (value != null) mmkv.encode(k, value) else mmkv.removeValueForKey(k)
-            notifyKeyChanged(k)
-        }
-    }
+    /** @param key MMKV 键名，为 null 时自动使用属性名；@param default 默认值 */
+    fun bytes(
+        key: String? = null,
+        default: ByteArray = EMPTY_BYTE_ARRAY,
+    ) = MmkvDelegateFactories.bytesProperty(mmkv, ::notifyKeyChanged, key, default)
+
+    /** Nullable ByteArray 类型属性委托。 */
+    fun nullableBytes(
+        key: String? = null,
+        default: ByteArray? = null,
+    ) = MmkvDelegateFactories.nullableBytesProperty(mmkv, ::notifyKeyChanged, key, default)
 
     /**
-     * Long 类型属性委托。
-     *
-     * @param key MMKV 键名，为 null 时自动使用属性名
-     * @param default 默认值
+     * Set\<String\> 类型属性委托；返回不可变集合，修改时需新建集合并重新赋值。
      */
-    fun long(key: String? = null, default: Long = 0L) = object : ReadWriteProperty<Any?, Long> {
-        override fun getValue(thisRef: Any?, property: KProperty<*>): Long {
-            val k = key ?: property.name
-            return mmkv.decodeLong(k, default)
-        }
-
-        override fun setValue(thisRef: Any?, property: KProperty<*>, value: Long) {
-            val k = key ?: property.name
-            mmkv.encode(k, value)
-            notifyKeyChanged(k)
-        }
-    }
+    fun stringSet(
+        key: String? = null,
+        default: Set<String> = emptySet(),
+    ) = MmkvDelegateFactories.stringSetProperty(mmkv, ::notifyKeyChanged, key, default)
 
     /**
-     * Nullable Long 类型属性委托。
-     *
-     * key 不存在时返回 null，赋值 null 时删除对应键。
-     *
-     * @param key MMKV 键名，为 null 时自动使用属性名
-     * @param default key 不存在时的默认值，默认 null
+     * Nullable Set\<String\> 类型属性委托；可区分「key 不存在」与「值为空集合」。
      */
-    fun nullableLong(key: String? = null, default: Long? = null) = object : ReadWriteProperty<Any?, Long?> {
-        override fun getValue(thisRef: Any?, property: KProperty<*>): Long? {
-            val k = key ?: property.name
-            return if (mmkv.containsKey(k)) mmkv.decodeLong(k) else default
-        }
-
-        override fun setValue(thisRef: Any?, property: KProperty<*>, value: Long?) {
-            val k = key ?: property.name
-            if (value != null) mmkv.encode(k, value) else mmkv.removeValueForKey(k)
-            notifyKeyChanged(k)
-        }
-    }
-
-    /**
-     * Float 类型属性委托。
-     *
-     * @param key MMKV 键名，为 null 时自动使用属性名
-     * @param default 默认值
-     */
-    fun float(key: String? = null, default: Float = 0f) = object : ReadWriteProperty<Any?, Float> {
-        override fun getValue(thisRef: Any?, property: KProperty<*>): Float {
-            val k = key ?: property.name
-            return mmkv.decodeFloat(k, default)
-        }
-
-        override fun setValue(thisRef: Any?, property: KProperty<*>, value: Float) {
-            val k = key ?: property.name
-            mmkv.encode(k, value)
-            notifyKeyChanged(k)
-        }
-    }
-
-    /**
-     * Nullable Float 类型属性委托。
-     *
-     * key 不存在时返回 null，赋值 null 时删除对应键。
-     *
-     * @param key MMKV 键名，为 null 时自动使用属性名
-     * @param default key 不存在时的默认值，默认 null
-     */
-    fun nullableFloat(key: String? = null, default: Float? = null) = object : ReadWriteProperty<Any?, Float?> {
-        override fun getValue(thisRef: Any?, property: KProperty<*>): Float? {
-            val k = key ?: property.name
-            return if (mmkv.containsKey(k)) mmkv.decodeFloat(k) else default
-        }
-
-        override fun setValue(thisRef: Any?, property: KProperty<*>, value: Float?) {
-            val k = key ?: property.name
-            if (value != null) mmkv.encode(k, value) else mmkv.removeValueForKey(k)
-            notifyKeyChanged(k)
-        }
-    }
-
-    /**
-     * Double 类型属性委托。
-     *
-     * @param key MMKV 键名，为 null 时自动使用属性名
-     * @param default 默认值
-     */
-    fun double(key: String? = null, default: Double = 0.0) = object : ReadWriteProperty<Any?, Double> {
-        override fun getValue(thisRef: Any?, property: KProperty<*>): Double {
-            val k = key ?: property.name
-            return mmkv.decodeDouble(k, default)
-        }
-
-        override fun setValue(thisRef: Any?, property: KProperty<*>, value: Double) {
-            val k = key ?: property.name
-            mmkv.encode(k, value)
-            notifyKeyChanged(k)
-        }
-    }
-
-    /**
-     * Nullable Double 类型属性委托。
-     *
-     * key 不存在时返回 null，赋值 null 时删除对应键。
-     *
-     * @param key MMKV 键名，为 null 时自动使用属性名
-     * @param default key 不存在时的默认值，默认 null
-     */
-    fun nullableDouble(key: String? = null, default: Double? = null) = object : ReadWriteProperty<Any?, Double?> {
-        override fun getValue(thisRef: Any?, property: KProperty<*>): Double? {
-            val k = key ?: property.name
-            return if (mmkv.containsKey(k)) mmkv.decodeDouble(k) else default
-        }
-
-        override fun setValue(thisRef: Any?, property: KProperty<*>, value: Double?) {
-            val k = key ?: property.name
-            if (value != null) mmkv.encode(k, value) else mmkv.removeValueForKey(k)
-            notifyKeyChanged(k)
-        }
-    }
-
-    /**
-     * Boolean 类型属性委托。
-     *
-     * @param key MMKV 键名，为 null 时自动使用属性名
-     * @param default 默认值
-     */
-    fun boolean(key: String? = null, default: Boolean = false) = object : ReadWriteProperty<Any?, Boolean> {
-        override fun getValue(thisRef: Any?, property: KProperty<*>): Boolean {
-            val k = key ?: property.name
-            return mmkv.decodeBool(k, default)
-        }
-
-        override fun setValue(thisRef: Any?, property: KProperty<*>, value: Boolean) {
-            val k = key ?: property.name
-            mmkv.encode(k, value)
-            notifyKeyChanged(k)
-        }
-    }
-
-    /**
-     * Nullable Boolean 类型属性委托。
-     *
-     * key 不存在时返回 null，赋值 null 时删除对应键。
-     * 可区分"key 不存在"和"值为 false"的场景。
-     *
-     * @param key MMKV 键名，为 null 时自动使用属性名
-     * @param default key 不存在时的默认值，默认 null
-     */
-    fun nullableBoolean(key: String? = null, default: Boolean? = null) = object : ReadWriteProperty<Any?, Boolean?> {
-        override fun getValue(thisRef: Any?, property: KProperty<*>): Boolean? {
-            val k = key ?: property.name
-            return if (mmkv.containsKey(k)) mmkv.decodeBool(k) else default
-        }
-
-        override fun setValue(thisRef: Any?, property: KProperty<*>, value: Boolean?) {
-            val k = key ?: property.name
-            if (value != null) mmkv.encode(k, value) else mmkv.removeValueForKey(k)
-            notifyKeyChanged(k)
-        }
-    }
-
-    /**
-     * ByteArray 类型属性委托。
-     *
-     * @param key MMKV 键名，为 null 时自动使用属性名
-     * @param default 默认值
-     */
-    fun bytes(key: String? = null, default: ByteArray = EMPTY_BYTE_ARRAY) = object : ReadWriteProperty<Any?, ByteArray> {
-        override fun getValue(thisRef: Any?, property: KProperty<*>): ByteArray {
-            val k = key ?: property.name
-            return mmkv.decodeBytes(k, default) ?: default
-        }
-
-        override fun setValue(thisRef: Any?, property: KProperty<*>, value: ByteArray) {
-            val k = key ?: property.name
-            mmkv.encode(k, value)
-            notifyKeyChanged(k)
-        }
-    }
-
-    /**
-     * Nullable ByteArray 类型属性委托。
-     *
-     * key 不存在时返回 null，赋值 null 时删除对应键。
-     *
-     * @param key MMKV 键名，为 null 时自动使用属性名
-     * @param default key 不存在时的默认值，默认 null
-     */
-    fun nullableBytes(key: String? = null, default: ByteArray? = null) = object : ReadWriteProperty<Any?, ByteArray?> {
-        override fun getValue(thisRef: Any?, property: KProperty<*>): ByteArray? {
-            val k = key ?: property.name
-            return if (mmkv.containsKey(k)) mmkv.decodeBytes(k) else default
-        }
-
-        override fun setValue(thisRef: Any?, property: KProperty<*>, value: ByteArray?) {
-            val k = key ?: property.name
-            if (value != null) mmkv.encode(k, value) else mmkv.removeValueForKey(k)
-            notifyKeyChanged(k)
-        }
-    }
-
-    /**
-     * Set\<String\> 类型属性委托。
-     *
-     * 返回的是不可变集合，修改时需创建新集合并重新赋值。
-     *
-     * @param key MMKV 键名，为 null 时自动使用属性名
-     * @param default 默认值
-     */
-    fun stringSet(key: String? = null, default: Set<String> = emptySet()) = object : ReadWriteProperty<Any?, Set<String>> {
-        override fun getValue(thisRef: Any?, property: KProperty<*>): Set<String> {
-            val k = key ?: property.name
-            return mmkv.decodeStringSet(k, default) ?: default
-        }
-
-        override fun setValue(thisRef: Any?, property: KProperty<*>, value: Set<String>) {
-            val k = key ?: property.name
-            mmkv.encode(k, value)
-            notifyKeyChanged(k)
-        }
-    }
-
-    /**
-     * Nullable Set\<String\> 类型属性委托。
-     *
-     * key 不存在时返回 null，赋值 null 时删除对应键。
-     * 可区分"key 不存在"和"值为空集合"的场景。
-     *
-     * @param key MMKV 键名，为 null 时自动使用属性名
-     * @param default key 不存在时的默认值，默认 null
-     */
-    fun nullableStringSet(key: String? = null, default: Set<String>? = null) = object : ReadWriteProperty<Any?, Set<String>?> {
-        override fun getValue(thisRef: Any?, property: KProperty<*>): Set<String>? {
-            val k = key ?: property.name
-            return if (mmkv.containsKey(k)) mmkv.decodeStringSet(k) else default
-        }
-
-        override fun setValue(thisRef: Any?, property: KProperty<*>, value: Set<String>?) {
-            val k = key ?: property.name
-            if (value != null) mmkv.encode(k, value) else mmkv.removeValueForKey(k)
-            notifyKeyChanged(k)
-        }
-    }
+    fun nullableStringSet(
+        key: String? = null,
+        default: Set<String>? = null,
+    ) = MmkvDelegateFactories.nullableStringSetProperty(mmkv, ::notifyKeyChanged, key, default)
 
     /**
      * Parcelable 类型属性委托。
@@ -1203,14 +1008,21 @@ open class MmkvDelegate(
     internal fun <T : Parcelable> parcelableDelegate(
         key: String? = null,
         clazz: Class<T>,
-        default: T? = null
+        default: T? = null,
     ) = object : ReadWriteProperty<Any?, T?> {
-        override fun getValue(thisRef: Any?, property: KProperty<*>): T? {
+        override fun getValue(
+            thisRef: Any?,
+            property: KProperty<*>,
+        ): T? {
             val k = key ?: property.name
             return mmkv.decodeParcelable(k, clazz, default)
         }
 
-        override fun setValue(thisRef: Any?, property: KProperty<*>, value: T?) {
+        override fun setValue(
+            thisRef: Any?,
+            property: KProperty<*>,
+            value: T?,
+        ) {
             val k = key ?: property.name
             if (value != null) {
                 mmkv.encode(k, value)
@@ -1233,59 +1045,8 @@ open class MmkvDelegate(
      */
     inline fun <reified T : Parcelable> parcelable(
         key: String? = null,
-        default: T? = null
+        default: T? = null,
     ) = parcelableDelegate(key, T::class.java, default)
-
-    /**
-     * Serializable 类型属性委托（reified 简化版）。
-     *
-     * 返回可空类型，赋值 null 时自动删除对应键。
-     * 使用字节数组存储 Serializable 对象。
-     *
-     * ```kotlin
-     * var config by serializable<AppConfig>()
-     * ```
-     *
-     * @param key MMKV 键名，为 null 时自动使用属性名
-     * @param default 默认值
-     */
-    @Deprecated(
-        message = "Java 序列化性能较差且存在兼容性风险，推荐使用 parcelable() 或 json() 替代",
-        level = DeprecationLevel.WARNING
-    )
-    inline fun <reified T : java.io.Serializable> serializable(
-        key: String? = null,
-        default: T? = null
-    ) = object : ReadWriteProperty<Any?, T?> {
-        override fun getValue(thisRef: Any?, property: KProperty<*>): T? {
-            val k = key ?: property.name
-            val bytes = mmkv.decodeBytes(k) ?: return default
-            return try {
-                java.io.ByteArrayInputStream(bytes).use { bis ->
-                    java.io.ObjectInputStream(bis).use { ois ->
-                        ois.readObject() as? T
-                    }
-                }
-            } catch (e: Exception) {
-                AwStoreLogger.w("serializable read failed for key=$k", e)
-                default
-            }
-        }
-
-        override fun setValue(thisRef: Any?, property: KProperty<*>, value: T?) {
-            val k = key ?: property.name
-            if (value != null) {
-                val bos = java.io.ByteArrayOutputStream()
-                java.io.ObjectOutputStream(bos).use { oos ->
-                    oos.writeObject(value)
-                }
-                mmkv.encode(k, bos.toByteArray())
-            } else {
-                mmkv.removeValueForKey(k)
-            }
-            notifyKeyChanged(k)
-        }
-    }
 
     /**
      * JSON 对象属性委托（reified 简化版）。
@@ -1307,22 +1068,29 @@ open class MmkvDelegate(
      */
     inline fun <reified T : Any> json(
         key: String? = null,
-        default: T? = null
+        default: T? = null,
     ) = jsonDelegate(key, T::class, default)
 
     @PublishedApi
     internal fun <T : Any> jsonDelegate(
         key: String?,
         clazz: KClass<T>,
-        default: T?
+        default: T?,
     ) = object : ReadWriteProperty<Any?, T?> {
-        override fun getValue(thisRef: Any?, property: KProperty<*>): T? {
+        override fun getValue(
+            thisRef: Any?,
+            property: KProperty<*>,
+        ): T? {
             val k = key ?: property.name
             val str = mmkv.decodeString(k, null) ?: return default
             return decodeJsonOrNull(str, clazz, k) ?: default
         }
 
-        override fun setValue(thisRef: Any?, property: KProperty<*>, value: T?) {
+        override fun setValue(
+            thisRef: Any?,
+            property: KProperty<*>,
+            value: T?,
+        ) {
             val k = key ?: property.name
             if (value != null) {
                 mmkv.encode(k, AwStoreJsonAdapter.toJson(value, clazz))
@@ -1338,95 +1106,126 @@ open class MmkvDelegate(
  * [MmkvDelegate.edit] 的接收者：封装常用 [MMKV.encode] 与删除操作，并跟踪变更的 key 以触发单进程回调。
  * 对「带过期时间」等重载，请通过 [mmkv] 执行并在写入后 [markKeyChanged]。
  */
-class MmkvEditScope @PublishedApi internal constructor(
-    /** 底层 MMKV，用于 [MMKV.encode] 带过期时间等重载；写入非常规 [encode] 后请 [markKeyChanged]。 */
-    val mmkv: MMKV,
-    private val changedKeys: MutableSet<String>
-) {
+class MmkvEditScope
+    @PublishedApi
+    internal constructor(
+        /** 底层 MMKV，用于 [MMKV.encode] 带过期时间等重载；写入非常规 [encode] 后请 [markKeyChanged]。 */
+        val mmkv: MMKV,
+        private val changedKeys: MutableSet<String>,
+    ) {
+        fun markKeyChanged(key: String) {
+            changedKeys.add(key)
+        }
 
-    fun markKeyChanged(key: String) {
-        changedKeys.add(key)
-    }
+        fun encode(
+            key: String,
+            value: Boolean,
+        ): Boolean {
+            val r = mmkv.encode(key, value)
+            changedKeys.add(key)
+            return r
+        }
 
-    fun encode(key: String, value: Boolean): Boolean {
-        val r = mmkv.encode(key, value)
-        changedKeys.add(key)
-        return r
-    }
+        fun encode(
+            key: String,
+            value: Int,
+        ): Boolean {
+            val r = mmkv.encode(key, value)
+            changedKeys.add(key)
+            return r
+        }
 
-    fun encode(key: String, value: Int): Boolean {
-        val r = mmkv.encode(key, value)
-        changedKeys.add(key)
-        return r
-    }
+        fun encode(
+            key: String,
+            value: Long,
+        ): Boolean {
+            val r = mmkv.encode(key, value)
+            changedKeys.add(key)
+            return r
+        }
 
-    fun encode(key: String, value: Long): Boolean {
-        val r = mmkv.encode(key, value)
-        changedKeys.add(key)
-        return r
-    }
+        fun encode(
+            key: String,
+            value: Float,
+        ): Boolean {
+            val r = mmkv.encode(key, value)
+            changedKeys.add(key)
+            return r
+        }
 
-    fun encode(key: String, value: Float): Boolean {
-        val r = mmkv.encode(key, value)
-        changedKeys.add(key)
-        return r
-    }
+        fun encode(
+            key: String,
+            value: Double,
+        ): Boolean {
+            val r = mmkv.encode(key, value)
+            changedKeys.add(key)
+            return r
+        }
 
-    fun encode(key: String, value: Double): Boolean {
-        val r = mmkv.encode(key, value)
-        changedKeys.add(key)
-        return r
-    }
+        fun encode(
+            key: String,
+            value: String?,
+        ): Boolean {
+            val r = mmkv.encode(key, value)
+            changedKeys.add(key)
+            return r
+        }
 
-    fun encode(key: String, value: String?): Boolean {
-        val r = mmkv.encode(key, value)
-        changedKeys.add(key)
-        return r
-    }
+        fun encode(
+            key: String,
+            value: ByteArray?,
+        ): Boolean {
+            val r = mmkv.encode(key, value)
+            changedKeys.add(key)
+            return r
+        }
 
-    fun encode(key: String, value: ByteArray?): Boolean {
-        val r = mmkv.encode(key, value)
-        changedKeys.add(key)
-        return r
-    }
+        fun encode(
+            key: String,
+            value: Set<String>?,
+        ): Boolean {
+            val r = mmkv.encode(key, value)
+            changedKeys.add(key)
+            return r
+        }
 
-    fun encode(key: String, value: Set<String>?): Boolean {
-        val r = mmkv.encode(key, value)
-        changedKeys.add(key)
-        return r
-    }
+        fun encode(
+            key: String,
+            value: Parcelable?,
+        ): Boolean {
+            val r = mmkv.encode(key, value)
+            changedKeys.add(key)
+            return r
+        }
 
-    fun encode(key: String, value: Parcelable?): Boolean {
-        val r = mmkv.encode(key, value)
-        changedKeys.add(key)
-        return r
-    }
+        fun removeValueForKey(key: String) {
+            mmkv.removeValueForKey(key)
+            changedKeys.add(key)
+        }
 
-    fun removeValueForKey(key: String) {
-        mmkv.removeValueForKey(key)
-        changedKeys.add(key)
-    }
+        fun removeValuesForKeys(keys: Array<out String>) {
+            mmkv.removeValuesForKeys(keys)
+            changedKeys.addAll(keys)
+        }
 
-    fun removeValuesForKeys(keys: Array<out String>) {
-        mmkv.removeValuesForKeys(keys)
-        changedKeys.addAll(keys)
-    }
-
-    fun clearAll() {
-        val snapshot = mmkv.allKeys()
-        mmkv.clearAll()
-        if (snapshot != null) {
-            changedKeys.addAll(listOf(*snapshot))
+        fun clearAll() {
+            val snapshot = mmkv.allKeys()
+            mmkv.clearAll()
+            if (snapshot != null) {
+                changedKeys.addAll(listOf(*snapshot))
+            }
         }
     }
-}
 
 /**
  * 尽力按「每个 key 一种 MMKV 类型」还原值；与 [MmkvDelegate.exportToMap] 的说明一致。
  * 顺序：StringSet → String → ByteArray → Int / Long / Float / Double（以哨兵排除「不存在的默认值」；存储 [Int] 的 [Int.MAX_VALUE] 会落入后续分支）。
  * 与 `0` 与 `false`、`1` 与 `true` 等歧义在 MMKV 中无法无 API 地消除，导出的数可能为 [Int] 或 [Double] 等，仅适合调试与迁移，勿依赖精确类型。
  */
-private fun decodeValueForExport(m: MMKV, key: String): Any? {
+private fun decodeValueForExport(
+    m: MMKV,
+    key: String,
+): Any? {
     if (!m.containsKey(key)) return null
     m.decodeStringSet(key, null as Set<String>?)?.let { return it }
     m.decodeString(key, null)?.let { return it }

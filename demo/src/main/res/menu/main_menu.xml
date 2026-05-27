@@ -4,27 +4,28 @@
 
     <item
         android:id="@+id/action_demo_playbook"
+        android:icon="@drawable/ic_help"
         android:title="@string/demo_playbook_title"
+        app:showAsAction="ifRoom" />
+
+    <item
+        android:id="@+id/action_unregister_listeners"
+        android:title="@string/menu_unregister_listeners"
         app:showAsAction="never" />
 
     <item
         android:id="@+id/action_copy_log"
-        android:title="Copy log"
+        android:title="@string/menu_copy_log"
         app:showAsAction="never" />
 
     <item
         android:id="@+id/action_share_log"
-        android:title="Share log"
-        app:showAsAction="never" />
-
-    <item
-        android:id="@+id/action_clear_log"
-        android:title="Clear log"
+        android:title="@string/menu_share_log"
         app:showAsAction="never" />
 
     <item
         android:id="@+id/action_clear_all"
-        android:title="Clear all"
+        android:title="@string/menu_clear_all"
         app:showAsAction="never" />
 
 </menu>

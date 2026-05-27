@@ -1,5 +1,61 @@
 <resources>
-    <string name="app_name">AwStore Demo</string>
-    <string name="demo_playbook_title">演示清单</string>
-    <string name="demo_playbook_message">索引见 demo/DEMO_MATRIX.md。\n\n主界面按钮覆盖委托类型、加密、多 mmap、SP 迁移、监听、批量与导出等。\n\n生产环境请阅读 README 中 MMKV 路径与加密密钥管理说明。</string>
+    <string name="app_name">AwStore</string>
+    <string name="app_subtitle">MMKV 封装演示</string>
+
+    <string name="log_panel_title">运行日志</string>
+    <string name="log_clear">清空</string>
+    <string name="log_placeholder">点击上方场景卡片运行演示…</string>
+
+    <string name="section_basics">入门</string>
+    <string name="section_types">数据类型</string>
+    <string name="section_instances">实例与进程</string>
+    <string name="section_advanced">进阶 API</string>
+    <string name="section_debug">调试</string>
+
+    <string name="demo_basics_rw_title">基本读写</string>
+    <string name="demo_basics_rw_sub">属性委托写入并读取 7 种基础类型</string>
+
+    <string name="demo_nullable_title">Nullable 语义</string>
+    <string name="demo_nullable_sub">赋 null 删键、缺省 default 占位</string>
+
+    <string name="demo_types_title">Parcelable / JSON / 字节</string>
+    <string name="demo_types_sub">复杂对象与 StringSet 一次性演示</string>
+
+    <string name="demo_secure_title">加密存储</string>
+    <string name="demo_secure_sub">独立 mmapId + CryptKey（Demo 固定密钥）</string>
+
+    <string name="demo_isolation_title">多实例隔离</string>
+    <string name="demo_isolation_sub">不同 mmapId 互不影响</string>
+
+    <string name="demo_multi_process_title">多进程计数</string>
+    <string name="demo_multi_process_sub">shared + multiProcess，展示 effectiveMmapId</string>
+
+    <string name="demo_migration_title">SharedPreferences 迁移</string>
+    <string name="demo_migration_sub">迁移并对比「删除 / 保留」原 SP</string>
+
+    <string name="demo_listeners_title">单进程 / 跨进程监听</string>
+    <string name="demo_listeners_sub">registerOnKeyChanged + registerContentChange</string>
+
+    <string name="demo_imperative_title">命令式与批量</string>
+    <string name="demo_imperative_sub">put/get、edit、TTL、sync/async</string>
+
+    <string name="demo_get_or_put_title">getOrPut</string>
+    <string name="demo_get_or_put_sub">懒初始化与 JSON 自恢复</string>
+
+    <string name="demo_debug_title">导出与管理</string>
+    <string name="demo_debug_sub">exportToMap、键列表、mmkvInstance</string>
+
+    <string name="demo_clear_title">清空所有 Store</string>
+    <string name="demo_clear_sub">重置 Demo 数据（不可恢复）</string>
+
+    <string name="demo_playbook_title">使用说明</string>
+    <string name="demo_playbook_message">按分类点击场景卡片即可运行演示，结果输出在底部日志。\n\n与 README「API 分层」对应：入门 → 类型 → 实例 → 进阶 → 调试。\n\n生产环境请参阅 README 的加密与多进程说明。</string>
+
+    <string name="menu_copy_log">复制日志</string>
+    <string name="menu_share_log">分享日志</string>
+    <string name="menu_unregister_listeners">注销监听</string>
+    <string name="menu_clear_all">清空存储</string>
+
+    <string name="confirm_clear_title">清空所有演示数据？</string>
+    <string name="confirm_clear_message">将清除所有 Demo Store 中的键值，且注销已注册的监听。</string>
 </resources>

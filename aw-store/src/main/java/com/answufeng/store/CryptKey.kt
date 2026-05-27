@@ -24,12 +24,10 @@ import java.security.SecureRandom
  * 注意：[toString] 返回 `"CryptKey(****)"`，不会暴露实际密钥内容。
  */
 class CryptKey private constructor(private val key: String) {
-
     /** 密钥的字符串值，仅供内部传递给 MMKV 使用 */
     val value: String get() = key
 
     companion object {
-
         /**
          * 从字符串创建 [CryptKey]。
          *

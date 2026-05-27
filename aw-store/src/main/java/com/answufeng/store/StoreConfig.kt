@@ -28,5 +28,5 @@ data class StoreConfig(
     val mmapId: String? = null,
     val cryptKey: String? = null,
     val secureCryptKey: CryptKey? = null,
-    val multiProcess: Boolean = false
+    val multiProcess: Boolean = false,
 )

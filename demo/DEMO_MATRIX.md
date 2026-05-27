@@ -1,14 +1,16 @@
 # aw-store Demo 功能矩阵
 
-主界面按钮覆盖：**基础类型 / Nullable / Nullable+default / Parcelable / Bytes / JSON / 加密 / 多 mmap / 多进程 / SP 迁移 / SP 迁移保留原 SP / 监听 / 注销监听 / sync-async / 命令式 / 批量 / edit+TTL+markKeyChanged / getOrPut（含 StringSet、Bytes）/ 导出导入 / MMKV 实例 / 键管理 / 体积 / 清空**。
+主界面按 **5 个分类、12 个场景** 组织（取代原先 30+ 零散按钮），底部固定 **运行日志** 面板。
 
-菜单：**演示清单 / 复制日志 / 分享 / 清除**。集成前请阅读 README 与 **MMKV 官方** 存储路径说明。
+| 分类 | 场景 | 覆盖能力 |
+|------|------|----------|
+| 入门 | 基本读写 | 属性委托、7 种基础类型 |
+| 入门 | Nullable 语义 | 赋 null 删键、default 占位 |
+| 数据类型 | Parcelable / JSON / 字节 | 复杂类型与命令式 JSON |
+| 实例与进程 | 加密 / 隔离 / 多进程 / SP 迁移 | mmapId、CryptKey、effectiveMmapId、SpMigration |
+| 进阶 API | 监听 / 命令式 / getOrPut | registerOnKeyChanged、registerContentChange、edit、TTL、getOrPutJson |
+| 调试 | 导出与管理 / 清空 | exportToMap、allKeys、mmkvInstance |
 
-## 推荐手测（边界与极端场景）
+菜单：**使用说明**、**注销监听**、**复制/分享日志**、**清空存储**。
 
-| 场景 | 建议操作 |
-|------|----------|
-| 加密 | `CryptKey` 轮转或错误密钥读旧文件的表现（应有明确失败路径） |
-| 多进程 | 双进程同时写同一 `mmapId`，对照 MMKV 文档预期 |
-| 迁移 | SP 大批量迁移中途杀进程，再启动是否可恢复 |
-| 监听 | 多 listener 注册/反注册，避免泄漏与重复回调 |
+集成前请阅读根目录 README 与 MMKV 官方文档。

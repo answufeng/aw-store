@@ -30,15 +30,13 @@
 - Android SDK 35
 - Kotlin 2.0+
 
-## 构建 & 测试
+## 构建
 
 ```bash
-./gradlew :aw-store:assembleRelease        # 构建库
+./gradlew :aw-store:assembleRelease   # 构建库
 ./gradlew :aw-store:ktlintCheck
 ./gradlew :aw-store:lintRelease
-./gradlew :demo:assembleRelease            # 构建 Demo
+./gradlew :demo:assembleRelease       # 构建 Demo
 ```
 
-## 发版前补充检查（R8）
-
-MMKV native 与 Parcelable/JSON 反射边界需 release 冒烟；升级 MMKV 主版本时同步 README 与 demo 多进程用例。
+发版前请在 Demo 中手测主要场景，并对 release 包做 R8 冒烟（Parcelable / JSON 模型需自行 keep）。

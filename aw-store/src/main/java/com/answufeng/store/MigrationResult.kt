@@ -12,7 +12,7 @@ data class MigrationResult(
     val totalKeys: Int,
     val successCount: Int,
     val failedCount: Int,
-    val skippedKeys: List<String>
+    val skippedKeys: List<String>,
 ) {
     /** 是否全部迁移成功（无失败、无跳过） */
     val isSuccess: Boolean get() = failedCount == 0 && skippedKeys.isEmpty()

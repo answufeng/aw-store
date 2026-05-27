@@ -22,9 +22,16 @@ import kotlin.reflect.KClass
  */
 interface StoreJsonAdapter {
     /** 将 [value] 序列化为 JSON 字符串 */
-    fun <T : Any> toJson(value: T, clazz: KClass<T>): String
+    fun <T : Any> toJson(
+        value: T,
+        clazz: KClass<T>,
+    ): String
+
     /** 将 JSON [json] 反序列化为 [clazz] 类型的对象 */
-    fun <T : Any> fromJson(json: String, clazz: KClass<T>): T
+    fun <T : Any> fromJson(
+        json: String,
+        clazz: KClass<T>,
+    ): T
 }
 
 /**
@@ -38,7 +45,6 @@ interface StoreJsonAdapter {
  * ```
  */
 object AwStoreJsonAdapter : StoreJsonAdapter {
-
     @Volatile
     private var impl: StoreJsonAdapter? = null
 
@@ -60,17 +66,23 @@ object AwStoreJsonAdapter : StoreJsonAdapter {
         impl = null
     }
 
-    override fun <T : Any> toJson(value: T, clazz: KClass<T>): String {
+    override fun <T : Any> toJson(
+        value: T,
+        clazz: KClass<T>,
+    ): String {
         return impl?.toJson(value, clazz)
             ?: throw IllegalStateException(
-                "请先调用 AwStoreJsonAdapter.setAdapter() 设置 JSON 适配器"
+                "请先调用 AwStoreJsonAdapter.setAdapter() 设置 JSON 适配器",
             )
     }
 
-    override fun <T : Any> fromJson(json: String, clazz: KClass<T>): T {
+    override fun <T : Any> fromJson(
+        json: String,
+        clazz: KClass<T>,
+    ): T {
         return impl?.fromJson(json, clazz)
             ?: throw IllegalStateException(
-                "请先调用 AwStoreJsonAdapter.setAdapter() 设置 JSON 适配器"
+                "请先调用 AwStoreJsonAdapter.setAdapter() 设置 JSON 适配器",
             )
     }
 }

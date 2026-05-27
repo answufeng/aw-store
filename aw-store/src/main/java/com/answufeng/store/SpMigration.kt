@@ -18,6 +18,24 @@ import java.security.MessageDigest
  * ```
  */
 object SpMigration {
+    /**
+     * 将指定 SharedPreferences 中的数据迁移到 MMKV（参数与 [MmkvDelegate] 的 [StoreConfig] 一致）。
+     */
+    fun migrate(
+        context: Context,
+        spName: String,
+        config: StoreConfig,
+        deleteAfterMigration: Boolean = true,
+    ): MigrationResult =
+        migrate(
+            context = context,
+            spName = spName,
+            mmapId = config.mmapId,
+            cryptKey = config.cryptKey,
+            secureCryptKey = config.secureCryptKey,
+            multiProcess = config.multiProcess,
+            deleteAfterMigration = deleteAfterMigration,
+        )
 
     /**
      * 将指定 SharedPreferences 中的数据迁移到 MMKV。
@@ -40,7 +58,7 @@ object SpMigration {
         cryptKey: String? = null,
         secureCryptKey: CryptKey? = null,
         multiProcess: Boolean = false,
-        deleteAfterMigration: Boolean = true
+        deleteAfterMigration: Boolean = true,
     ): MigrationResult {
         AwStore.ensureInitialized()
 
@@ -78,7 +96,7 @@ object SpMigration {
     fun migrateAll(
         context: Context,
         spNames: List<String>,
-        deleteAfterMigration: Boolean = true
+        deleteAfterMigration: Boolean = true,
     ): List<MigrationResult> {
         return spNames.map { spName ->
             migrate(context, spName, mmapId = spName, deleteAfterMigration = deleteAfterMigration)
@@ -86,20 +104,43 @@ object SpMigration {
     }
 
     /**
+     * 解析与 [resolveMmkv] 实际打开实例一致的 MMKV 实例 ID（用于跨进程 [MmkvDelegate.registerContentChange] 等）。
+     *
+     * 单进程默认实例为 `"DefaultMMKV"`；仅加密无 [mmapId] 时为 `aw_crypt_{stableId}`；
+     * 多进程且无 [mmapId] 时为 `aw_default_multi`。
+     */
+    fun resolveEffectiveMmapId(
+        mmapId: String? = null,
+        cryptKey: String? = null,
+        multiProcess: Boolean = false,
+    ): String =
+        when {
+            mmapId != null -> mmapId
+            cryptKey != null -> "aw_crypt_${stableIdForCryptKey(cryptKey)}"
+            multiProcess -> "aw_default_multi"
+            else -> "DefaultMMKV"
+        }
+
+    /**
      * 根据参数解析 MMKV 实例。
      *
      * 使用 SHA-256 前 64 位作为 cryptKey 的稳定标识，避免 String.hashCode() 碰撞。
      */
-    internal fun resolveMmkv(mmapId: String?, cryptKey: String?, multiProcess: Boolean = false): MMKV {
+    internal fun resolveMmkv(
+        mmapId: String?,
+        cryptKey: String?,
+        multiProcess: Boolean = false,
+    ): MMKV {
         val mode = if (multiProcess) MMKV.MULTI_PROCESS_MODE else MMKV.SINGLE_PROCESS_MODE
         return when {
             mmapId != null && cryptKey != null -> MMKV.mmkvWithID(mmapId, mode, cryptKey)
             mmapId != null -> MMKV.mmkvWithID(mmapId, mode)
             cryptKey != null -> {
-                val stableId = stableIdForCryptKey(cryptKey)
-                MMKV.mmkvWithID("aw_crypt_$stableId", mode, cryptKey)
+                val id = resolveEffectiveMmapId(null, cryptKey, multiProcess)
+                MMKV.mmkvWithID(id, mode, cryptKey)
             }
-            else -> if (multiProcess) MMKV.mmkvWithID("aw_default_multi", mode) else MMKV.defaultMMKV()
+            multiProcess -> MMKV.mmkvWithID(resolveEffectiveMmapId(null, null, true), mode)
+            else -> MMKV.defaultMMKV()
         }
     }
 
@@ -108,8 +149,9 @@ object SpMigration {
      * 为 [internal] 供同模块内部复用；行为变更视为兼容敏感变更。
      */
     internal fun stableIdForCryptKey(cryptKey: String): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-            .digest(cryptKey.toByteArray())
+        val digest =
+            MessageDigest.getInstance("SHA-256")
+                .digest(cryptKey.toByteArray())
         return digest.take(8).joinToString("") { "%02x".format(it) }
     }
 }

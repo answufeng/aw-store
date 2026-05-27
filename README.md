@@ -22,11 +22,11 @@ dependencyResolutionManagement {
 
 // app/build.gradle.kts
 dependencies {
-    implementation("com.github.answufeng:aw-store:1.0.2")
+    implementation("com.github.answufeng:aw-store:1.1.0")
 }
 ```
 
-`implementation` 中的 **版本号与 Git / JitPack 的 tag 一致**（上例为 `1.0.2`）。  
+`implementation` 中的 **版本号与 Git / JitPack 的 tag 一致**（上例为 `1.1.0`）。  
 MMKV 通过本库以 **`api`** 方式传递，一般无需再额外声明。
 
 ---
@@ -101,12 +101,20 @@ Key 可省略（默认用**属性名**），也可 `long("user_id", 0L)`。未�
 
 | 类别 | 能力 |
 |------|------|
-| 委托 / 类型 | 基本类型、ByteArray、StringSet、Nullable、Parcelable、`json<T>()`、已弃用的 Serializable |
-| API 形态 | 属性委托、`getXxx`/`putXxx`、`edit { }`、`getOrPut*`（含 StringSet、Bytes、Json）、`exportToMap` / `importFromMap` |
+| 委托 / 类型 | 基本类型、ByteArray、StringSet、Nullable、Parcelable、`json<T>()` |
+| API 形态 | 属性委托、`getXxx`/`putXxx`、`edit { }`、`getOrPut*`（含 StringSet、Bytes、Json）、`effectiveMmapId` |
 | 安全与隔离 | `CryptKey`、AES-CFB、按 `mmapId` 分文件、`StoreConfig` |
 | 进程 | `multiProcess`、跨进程 `registerContentChange`、单进程 `registerOnKeyChanged` |
-| 迁移 | `SpMigration.migrate` / `migrateAll` |
+| 迁移 | `SpMigration.migrate` / `migrateAll`（支持 `StoreConfig`） |
 | 其它 | `sync` / `async`、`mmkvInstance`、调试日志、consumer ProGuard 规则 |
+
+### API 分层（推荐用法）
+
+| 层级 | 典型 API | 说明 |
+|------|----------|------|
+| **日常** | `string()` / `putString` / `edit { }` | 业务 Store 继承 `MmkvDelegate` 即可 |
+| **进阶** | `getOrPut*`、`registerOnKeyChanged`、`SpMigration` | 懒初始化、监听、SP 迁移 |
+| **底层** | `mmkvInstance`、`exportToMap` / `importFromMap` | TTL、trim、调试备份（勿当生产严谨备份） |
 
 ---
 
@@ -145,18 +153,14 @@ object UserStore : MmkvDelegate() {
 
 ### 命令式 API
 
-适合动态 key：`putString`/`getString`、`putInt`/`getInt`，以及 Long / Float / Double / Boolean / Bytes / StringSet、`putParcelable`/`getParcelable`、`putSerializable`/`getSerializable`、`putJson`/`getJson`。
+适合动态 key：`putString`/`getString`、`putInt`/`getInt`，以及 Long / Float / Double / Boolean / Bytes / StringSet、`putParcelable`/`getParcelable`、`putJson`/`getJson`。
 
-### TTL 便捷方法
+### 带过期时间（TTL）
 
-带过期时间的写入，底层使用 MMKV 原生 `encode(key, value, expireSeconds)`：
+使用底层 `mmkvInstance.encode(key, value, expireSeconds)`，写入后若需单进程监听请自行在业务层处理（或 `edit` 内 `mmkv.encode` + `markKeyChanged`）：
 
 ```kotlin
-UserStore.putStringWithTtl("captcha", "abc123", expireSeconds = 300)
-UserStore.putIntWithTtl("retry_count", 3, expireSeconds = 60)
-UserStore.putBooleanWithTtl("promo_shown", true, expireSeconds = 86400)
-// 支持：putStringWithTtl / putIntWithTtl / putLongWithTtl / putFloatWithTtl
-//       putDoubleWithTtl / putBooleanWithTtl / putBytesWithTtl
+UserStore.mmkvInstance.encode("captcha", "abc123", 300)
 ```
 
 过期后键仍存在但读取返回默认值；`contains` 仍为 `true`，`allKeys` 仍包含该键。
@@ -179,10 +183,14 @@ val token = UserStore.getOrPutString("token") { "default" }
 val profile = UserStore.getOrPutJson("profile") { UserProfile("guest", 0) }
 ```
 
-支持：`getOrPutString` … `Double`、`getOrPutStringSet`、`getOrPutBytes`、`getOrPutJson`（需先 `AwStoreJsonAdapter.setAdapter`）。同一 `MmkvDelegate` 实例内 **`getOrPut*` 互斥**，缺失时 default **至多执行一次**。  
-`getOrPutJson`：键不存在则写入；**反序列化失败**时用 `defaultValue` **覆盖**（自恢复）。
+支持：`getOrPutString` … `Double`、`getOrPutStringSet`、`getOrPutBytes`、`getOrPutJson`（需先 `AwStoreJsonAdapter.setAdapter`）。**同一 key** 上并发时 default **至多执行一次**（不同 key 互不阻塞）。  
+`getOrPutJson`：键不存在则写入；反序列化失败时默认（`recoverOnParseError = true`）用 `defaultValue` **覆盖**；设为 `false` 则只打日志、不覆写：
 
-### 导出 / 导入
+```kotlin
+val profile = UserStore.getOrPutJson("profile", recoverOnParseError = false) { UserProfile("guest", 0) }
+```
+
+### 导出 / 导入（调试 / 简单迁移）
 
 ```kotlin
 val data = UserStore.exportToMap()
@@ -190,7 +198,7 @@ UserStore.importFromMap(data)
 UserStore.importFromMap(data, notifyKeyChanges = false) // 写完再按 key 去重回调，适合大批量
 ```
 
-`exportToMap` 按类型试探解码，**不适合**要求精确类型的严谨备份；`importFromMap` 支持类型含 `Byte`/`Short`、`BigDecimal`（转 Double）、`BigInteger`（须在 **Long** 精确范围内，否则跳过并 WARN）。
+`exportToMap` 按类型试探解码，**不适合**严谨生产备份；`importFromMap` 支持 String / 数值 / Boolean / ByteArray / `Set<String>` / `null`（删键）。
 
 ### Parcelable
 
@@ -203,10 +211,6 @@ object DataStore : MmkvDelegate() {
 }
 ```
 
-### Serializable（不推荐）
-
-已 `@Deprecated(WARNING)`，建议 `parcelable` 或 `json`。
-
 ### JSON
 
 实现 `StoreJsonAdapter`，`AwStoreJsonAdapter.setAdapter(…)` 后使用 `json<UserProfile>()` 或 `putJson`/`getJson`。
@@ -218,21 +222,28 @@ AwStoreJsonAdapter.setAdapter(GsonAdapter())
 
 ### 加密
 
+生产环境请用 **Keystore / 服务端下发** 等持久化密钥，勿把密钥提交进仓库：
+
 ```kotlin
-object SecureStore : MmkvDelegate(secureCryptKey = CryptKey.fromSecureRandom()) {
+object SecureStore : MmkvDelegate(
+    mmapId = "secure",
+    secureCryptKey = CryptKey.fromString(keystoreBackedKey)
+) {
     var password by string()
 }
 ```
 
-`CryptKey.fromSecureRandom()` 须在 **`object` 初始化**中调用一次；卸载重装密钥会变。`CryptKey.toString()` 为 `CryptKey(****)`。
+`CryptKey.fromSecureRandom()` 仅适合进程内一次性场景；卸载重装密钥会变。`CryptKey.toString()` 为 `CryptKey(****)`。
 
 ### 多实例与 `StoreConfig`
+
+参数 ≤2 时可直接用构造函数；≥3 时推荐 `StoreConfig`：
 
 ```kotlin
 object ConfigStore : MmkvDelegate(mmapId = "config") { }
 object SecureStore : MmkvDelegate(StoreConfig(
     mmapId = "secure",
-    secureCryptKey = CryptKey.fromSecureRandom(),
+    secureCryptKey = CryptKey.fromString(keystoreBackedKey),
     multiProcess = true
 )) { }
 ```
@@ -256,6 +267,7 @@ object SharedStore : MmkvDelegate(mmapId = "shared", multiProcess = true) {
 ```kotlin
 val result = SpMigration.migrate(this, "app_prefs")
 SpMigration.migrate(this, "app_prefs", mmapId = "user_store")
+SpMigration.migrate(this, "app_prefs", config = StoreConfig(mmapId = "user_store", multiProcess = true))
 SpMigration.migrate(this, "app_prefs", deleteAfterMigration = false)
 val results = SpMigration.migrateAll(this, listOf("a", "b"))
 ```
@@ -266,6 +278,17 @@ val results = SpMigration.migrateAll(this, listOf("a", "b"))
 
 - **跨进程**（他进程写入）：`registerContentChange` / `unregisterContentChange` / `unregisterAllContentChange`
 - **单进程**（本进程写入具体 key）：`registerOnKeyChanged` / `unregisterOnKeyChanged` / `clearOnKeyChangedListeners`
+
+默认监听目标为当前 Store 的 **`effectiveMmapId`**（与 MMKV 实际实例一致）：
+
+| 配置 | `effectiveMmapId` |
+|------|-------------------|
+| 默认单进程 | `DefaultMMKV` |
+| `multiProcess = true` 且无 `mmapId` | `aw_default_multi` |
+| 仅加密且无 `mmapId` | `aw_crypt_{stableId}` |
+| 显式 `mmapId` | 即该 `mmapId` |
+
+一般可直接 `registerContentChange { … }`；监听其它实例时传入 `targetMmapId`。同一 listener **重复注册会回调多次**；listener 内异常不会影响其它 listener。
 
 ### 工具方法
 
@@ -293,7 +316,8 @@ val results = SpMigration.migrateAll(this, listOf("a", "b"))
 | Key 默认值 | 省略 key 时，键名 = **属性名**；重命名属性会导致“读不到旧值”。请用显式 key 保持兼容：`long("user_id", 0L)`。 |
 | 赋 `null` 的语义 | `nullable*` 委托：赋 `null` = **删键**。 |
 | `CryptKey` | 不要把密钥写进仓库或日志；卸载重装后 `fromSecureRandom()` 会变化，旧数据将无法解密。 |
-| 多进程 | 同一份数据各进程需相同 `mmapId` 且 `multiProcess = true`；跨进程监听用 `registerContentChange`。 |
+| 多进程 | 同一份数据各进程需相同 `mmapId` 且 `multiProcess = true`；跨进程监听用 `registerContentChange`（默认 `effectiveMmapId`）。 |
+| 监听 | 重复注册同一 listener 会触发多次；跨进程请确认 `effectiveMmapId` 与目标实例一致。 |
 
 ### 密钥与加密（常见误用）
 
@@ -310,8 +334,8 @@ val results = SpMigration.migrateAll(this, listOf("a", "b"))
 | 项 | 说明 |
 |----|------|
 | Demo | 模块 `demo/`，能力索引：[demo/DEMO_MATRIX.md](demo/DEMO_MATRIX.md) |
-| 本地建议命令 | `./gradlew :aw-store:assembleRelease :aw-store:ktlintCheck :aw-store:lintRelease :aw-store:testDebugUnitTest :demo:assembleRelease`（需 **JDK 17+**） |
-| CI | [`.github/workflows/ci.yml`](.github/workflows/ci.yml)：assemble、ktlint、Lint、单测、demo release |
+| 本地建议命令 | `./gradlew :aw-store:assembleRelease :aw-store:ktlintCheck :aw-store:lintRelease :demo:assembleRelease`（需 **JDK 17+**） |
+| CI | [`.github/workflows/ci.yml`](.github/workflows/ci.yml)：assemble、ktlint、Lint、demo release |
 | 贡献 | [CONTRIBUTING.md](CONTRIBUTING.md) |
 
 ---
@@ -335,7 +359,7 @@ val results = SpMigration.migrateAll(this, listOf("a", "b"))
 ## 注意事项
 
 - **Key / StringSet**：推断 key 改名需迁移；`stringSet` 返回不可变，修改请新建集合并赋值。
-- **Serializable**：deprecated，优先 Parcelable / JSON。
+- **复杂类型**：优先 Parcelable / JSON，勿使用 Java 序列化。
 - **ProGuard / R8**：[consumer-rules.pro](aw-store/consumer-rules.pro) 类级保留公开 API；**自有 JSON 模型类**仍需自行 keep；MMKV 随 AAR。
 - **sync / async**：关键数据可考虑 `sync()`；非关键可用 `async()`。
 - **线程**：MMKV 与封装侧常规使用为线程安全场景。
@@ -345,5 +369,3 @@ val results = SpMigration.migrateAll(this, listOf("a", "b"))
 ## 许可证
 
 Apache License 2.0，见 [LICENSE](LICENSE)。
-
-*文档修订：2026-04-27（与 1.0.2 同步）。*

@@ -25,7 +25,6 @@ import java.io.File
  * ```
  */
 object AwStore {
-
     @Volatile
     private var initialized = false
 
@@ -39,7 +38,11 @@ object AwStore {
      * @param rootDir 自定义存储根目录，为 null 时使用默认目录（`files/mmkv`）
      * @param logEnabled 是否启用调试日志，默认 false
      */
-    fun init(context: Context, rootDir: String? = null, logEnabled: Boolean = false) {
+    fun init(
+        context: Context,
+        rootDir: String? = null,
+        logEnabled: Boolean = false,
+    ) {
         val appContext = context.applicationContext
         synchronized(this) {
             if (initialized) {
@@ -62,10 +65,12 @@ object AwStore {
         }
     }
 
-    private fun isDebuggable(context: Context): Boolean =
-        (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+    private fun isDebuggable(context: Context): Boolean = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
 
-    private fun sameRootDirectory(current: String, requested: String): Boolean {
+    private fun sameRootDirectory(
+        current: String,
+        requested: String,
+    ): Boolean {
         return try {
             File(current).canonicalPath == File(requested).canonicalPath
         } catch (_: Exception) {

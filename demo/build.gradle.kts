@@ -13,7 +13,7 @@ android {
         minSdk = 24
         targetSdk = 35
         versionCode = 1
-        versionName = "1.0.2"
+        versionName = "1.1.0"
     }
 
     compileOptions {
@@ -43,5 +43,6 @@ dependencies {
     implementation(libs.appcompat)
     implementation(libs.material)
     implementation(libs.constraintlayout)
+    implementation("androidx.recyclerview:recyclerview:1.3.2")
     implementation("com.google.code.gson:gson:2.11.0")
 }

@@ -27,7 +27,7 @@ android {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
             )
         }
     }
@@ -35,10 +35,6 @@ android {
     lint {
         abortOnError = true
         warningsAsErrors = false
-    }
-
-    testOptions {
-        unitTests.isIncludeAndroidResources = true
     }
 }
 
@@ -51,10 +47,6 @@ dependencies {
     api(libs.mmkv)
     implementation(libs.core.ktx)
     implementation(libs.annotation)
-
-    testImplementation(libs.junit)
-    testImplementation(libs.robolectric)
-    testImplementation(libs.androidx.test.core)
 }
 
-apply(from = "${rootDir}/gradle/publish.gradle.kts")
+apply(from = "$rootDir/gradle/publish.gradle.kts")
